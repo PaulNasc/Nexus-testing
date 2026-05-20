@@ -1,0 +1,711 @@
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { usePaginationUrlSync } from '@/hooks/usePaginationUrlSync';
+import { useVirtualTableHeight } from '@/hooks/useVirtualTableHeight';
+import { useSearchParams } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Plus, Edit, Trash2, Search, ArrowUpDown, ListFilter, Download, FileText, Calendar, Sparkles } from 'lucide-react';
+import { PriorityTag } from '@/components/ui/PriorityTag';
+import { UserAvatar } from '@/components/ui/UserAvatar';
+import { useAuth } from '@/hooks/useAuth';
+import { getTestCases, getTestCasesByProject, deleteTestCase, getTestPlans, getCaseLinkedCounts } from '@/services/apiClientService';
+import { TestCase } from '@/types';
+import { TestCaseForm } from '@/components/forms/TestCaseForm';
+import { DetailModal } from '@/components/DetailModal';
+import { StandardButton } from '@/components/StandardButton';
+import { AIGeneratorForm } from '@/components/forms/AIGeneratorForm';
+import { ViewModeToggle } from '@/components/ViewModeToggle';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { priorityBadgeClass, priorityLabel } from '@/lib/labels';
+import { testCaseTypeBadgeClass, testCaseTypeLabel } from '@/lib/labels';
+import { useProject } from '@/contexts/ProjectContext';
+import { ProjectDisplayField } from '@/components/ProjectDisplayField';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
+
+export const TestCases = () => {
+  const { initFromSearchParams, writeFromState } = usePaginationUrlSync();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  
+  // Refs para altura virtual
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const listHeaderRef = useRef<HTMLDivElement | null>(null);
+  const listCardRef = useRef<HTMLDivElement | null>(null);
+  const paginationRef = useRef<HTMLDivElement | null>(null);
+  const [rowSize, setRowSize] = useState<number>(72);
+  const { toast } = useToast();
+  const { currentProject, projects } = useProject();
+  const isProjectInactive = !!currentProject && currentProject.status !== 'active';
+  
+  // Estados principais
+  const [cases, setCases] = useState<TestCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [editingCase, setEditingCase] = useState<TestCase | null>(null);
+  const [selectedCase, setSelectedCase] = useState<TestCase | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  // UI Estados
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>(() => {
+    const savedMode = localStorage.getItem('testCases_viewMode');
+    return (savedMode as 'cards' | 'list') || 'list';
+  });
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(9);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'sequence' | 'created_at'>('sequence');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [q, setQ] = useState('');
+  const [dateStart, setDateStart] = useState<string>('');
+  const [dateEnd, setDateEnd] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'plan' | 'case' | 'execution'>('all');
+  const [applied, setApplied] = useState<{ q: string; dateStart?: string; dateEnd?: string; type: 'all' | 'plan' | 'case' | 'execution' }>({ q: '', type: 'all' });
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [planProjectMap, setPlanProjectMap] = useState<Record<string, string>>({});
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletingCaseId, setDeletingCaseId] = useState<string | null>(null);
+  const [caseLinkedCounts, setCaseLinkedCounts] = useState<{ executionCount: number; defectCount: number } | null>(null);
+
+  // Carregar casos com base no filtro de projeto
+  const loadCases = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      let data: TestCase[] = [];
+
+      if (currentProject?.id) {
+        data = await getTestCasesByProject(user.id, currentProject.id);
+        const plans = await getTestPlans(user.id, currentProject.id);
+        const map: Record<string, string> = {};
+        plans.forEach((p) => { map[p.id] = p.project_id; });
+        setPlanProjectMap(map);
+      } else {
+        // Agregar APENAS projetos ATIVOS ao usar "Todos"
+        const active = (projects || []).filter(p => p.status === 'active');
+        if (active.length > 0) {
+          const [casesLists, plansLists] = await Promise.all([
+            Promise.all(active.map(p => getTestCasesByProject(user.id, p.id))),
+            Promise.all(active.map(p => getTestPlans(user.id, p.id)))
+          ]);
+          data = casesLists.flat();
+          const plans = plansLists.flat();
+          const map: Record<string, string> = {};
+          plans.forEach((p) => { map[p.id] = p.project_id; });
+          setPlanProjectMap(map);
+        } else {
+          data = [];
+          setPlanProjectMap({});
+        }
+      }
+
+      setCases(data);
+    } catch (error) {
+      console.error('Erro ao carregar casos:', error);
+      toast({ 
+        title: 'Erro', 
+        description: 'Falha ao carregar casos de teste.', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Efeito para carregar casos quando projeto muda
+  useEffect(() => {
+    loadCases();
+  }, [user, currentProject?.id, projects]);
+
+  // Removido filtro de projeto local: controle é global pelo Dashboard
+
+  // Salvar modo de visualização
+  useEffect(() => {
+    localStorage.setItem('testCases_viewMode', viewMode);
+  }, [viewMode]);
+
+  // Listener para broadcast de troca de projeto (padronizado)
+  useEffect(() => {
+    const handler = () => loadCases();
+    window.addEventListener('krg:project-changed', handler as EventListener);
+    return () => window.removeEventListener('krg:project-changed', handler as EventListener);
+  }, []);
+
+  // Sincronizar modal de detalhes com a URL (?id=...&modal=case:view)
+  useEffect(() => {
+    const id = searchParams.get('id');
+    const modal = searchParams.get('modal');
+    if (id && (modal === 'case:view' || !modal)) {
+      const found = cases.find(c => c.id === id);
+      if (found) {
+        setSelectedCase(found);
+        setShowDetailModal(true);
+      }
+    }
+  }, [cases, searchParams]);
+
+  // Casos filtrados e ordenados
+  const filteredCases = useMemo(() => {
+    const filtered = cases.filter(testCase => {
+      const matchesSearch = searchTerm === '' || 
+        testCase.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        testCase.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        testCase.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = filterStatus === 'all' || testCase.priority === filterStatus;
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    // Ordenação
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'sequence':
+          comparison = (a.sequence || 0) - (b.sequence || 0);
+          break;
+        case 'created_at':
+        default:
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [cases, searchTerm, filterStatus, sortBy, sortOrder]);
+
+  // Paginação
+  const totalItems = filteredCases.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginatedCases = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredCases.slice(start, start + pageSize);
+  }, [filteredCases, currentPage, pageSize]);
+
+  // Quando houver múltiplos projetos entre os casos filtrados, prefixar IDs para evitar ambiguidade visual
+  const multipleProjects = useMemo(() => {
+    const ids = new Set(filteredCases.map(tc => (planProjectMap[tc.plan_id] || '')));
+    return ids.size > 1;
+  }, [filteredCases, planProjectMap]);
+
+  // Reset página quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, sortBy, sortOrder]);
+
+  // Handlers para filtros
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
+
+  // Removido: manipulação de filtro de projeto local
+
+  // Handlers
+  const handleCaseCreated = (testCase: TestCase) => {
+    setCases(prev => [testCase, ...prev]);
+    setShowForm(false);
+    setEditingCase(null);
+    toast({ title: 'Sucesso', description: 'Caso de teste criado com sucesso!' });
+  };
+
+  const handleCaseUpdated = (updated: TestCase) => {
+    setCases(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setShowForm(false);
+    setEditingCase(null);
+    toast({ title: 'Sucesso', description: 'Caso de teste atualizado com sucesso!' });
+  };
+
+  const handleEdit = (testCase: TestCase) => {
+    setEditingCase(testCase);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingCaseId(id);
+    setConfirmDeleteOpen(true);
+    setCaseLinkedCounts(null);
+    try {
+      if (user) {
+        const counts = await getCaseLinkedCounts(user.id, id);
+        setCaseLinkedCounts(counts);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar vínculos do caso:', error);
+      setCaseLinkedCounts({ executionCount: 0, defectCount: 0 });
+    }
+  };
+
+  const performDeleteCase = async () => {
+    if (!deletingCaseId) return;
+    if (isProjectInactive) {
+      toast({ title: 'Projeto não ativo', description: 'Exclusão desabilitada.', variant: 'destructive' });
+      setConfirmDeleteOpen(false);
+      setDeletingCaseId(null);
+      setCaseLinkedCounts(null);
+      return;
+    }
+    try {
+      if (caseLinkedCounts && (caseLinkedCounts.executionCount > 0 || caseLinkedCounts.defectCount > 0)) {
+        toast({
+          title: 'Exclusão bloqueada',
+          description: 'Este caso possui execuções e/ou defeitos vinculados. Remova as dependências antes de excluir.',
+          variant: 'destructive'
+        });
+        setConfirmDeleteOpen(false);
+        setDeletingCaseId(null);
+        return;
+      }
+      await deleteTestCase(deletingCaseId);
+      setCases(prev => prev.filter(c => c.id !== deletingCaseId));
+      toast({ title: 'Sucesso', description: 'Caso de teste excluído com sucesso!' });
+      if (selectedCase?.id === deletingCaseId) {
+        setSelectedCase(null);
+        setShowDetailModal(false);
+        setSearchParams(prev => {
+          const np = new URLSearchParams(prev);
+          np.delete('id');
+          np.delete('modal');
+          return np;
+        });
+      }
+    } catch (error) {
+      toast({ 
+        title: 'Erro', 
+        description: 'Erro ao excluir caso de teste', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setConfirmDeleteOpen(false);
+      setDeletingCaseId(null);
+      setCaseLinkedCounts(null);
+    }
+  };
+
+  const handleViewDetails = (testCase: TestCase) => {
+    setSelectedCase(testCase);
+    setShowDetailModal(true);
+    setSearchParams(prev => {
+      const np = new URLSearchParams(prev);
+      np.set('id', testCase.id);
+      np.set('modal', 'case:view');
+      return np;
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-pulse text-muted-foreground">Carregando casos...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Casos de Teste</h1>
+          <p className="text-sm text-muted-foreground">Gerencie seus casos de teste</p>
+        </div>
+<div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            title="Gerar Caso com IA"
+            disabled={!currentProject || currentProject.status !== 'active'}
+            onClick={() => setShowAIModal(true)}
+          >
+            <Sparkles className="h-4 w-4 text-amber-400" />
+          </Button>
+          <StandardButton 
+          variant="brand"
+          onClick={() => setShowForm(true)}
+          disabled={!currentProject || currentProject.status !== 'active'}
+          title={!currentProject ? 'Selecione um projeto ativo para criar casos' : (currentProject.status !== 'active' ? 'Projeto não ativo — criação desabilitada' : undefined)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Caso de Teste
+        </StandardButton>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => handleSearchTermChange(e.target.value)}
+            placeholder="Buscar por título, ID ou descrição"
+            className="pl-9 h-9 bg-muted/20 border-border/60"
+          />
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-3 border border-border/60 hover:border-border font-normal">
+                <ArrowUpDown className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline text-sm">Ordenar</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('desc'); }}>ID (maior primeiro)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('asc'); }}>ID (menor primeiro)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('desc'); }}>Data (mais recente)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('asc'); }}>Data (mais antiga)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className={cn(
+                'h-9 gap-1.5 px-3 border font-normal',
+                filterStatus !== 'all'
+                  ? 'border-brand/50 text-brand bg-brand/5 hover:bg-brand/10'
+                  : 'border-border/60 hover:border-border'
+              )}>
+                <ListFilter className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline text-sm">
+                  {filterStatus === 'all' ? 'Todos' : priorityLabel(filterStatus as 'low'|'medium'|'high'|'critical')}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setFilterStatus('all')}>Todos</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setFilterStatus('low')}>Prioridade Baixa</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterStatus('medium')}>Prioridade Média</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterStatus('high')}>Prioridade Alta</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setFilterStatus('critical')}>Prioridade Crítica</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-3 border border-border/60 hover:border-border font-normal">
+                <Download className="h-3.5 w-3.5 shrink-0" />
+                <span className="hidden sm:inline text-sm">Exportar</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>Exportar como CSV</DropdownMenuItem>
+              <DropdownMenuItem>Exportar como Excel</DropdownMenuItem>
+              <DropdownMenuItem>Exportar como PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      {/* Content */}
+      {viewMode === 'cards' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCases.length > 0 ? paginatedCases.map((testCase) => (
+            <Card
+              key={testCase.id}
+              className="border border-border/50 cursor-pointer card-hover flex flex-col"
+              onClick={() => handleViewDetails(testCase)}
+            >
+              <CardHeader className="p-4 pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
+                      {`CT-${testCase.sequence ? String(testCase.sequence).padStart(3, '0') : (testCase.id?.slice(0, 4) || '----')}`}
+                    </span>
+                    <CardTitle className="text-sm font-semibold line-clamp-2 leading-snug min-w-0">
+                      {testCase.title}
+                    </CardTitle>
+                  </div>
+                  {Boolean(testCase.generated_by_ai) && (
+                    <span title="Gerado por IA"><Sparkles className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" /></span>
+                  )}
+                </div>
+                <div className="mt-1.5">
+                  <PriorityTag priority={testCase.priority} />
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 flex flex-col flex-1">
+                <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                  {testCase.description || 'Sem descrição'}
+                </p>
+                <div className="mt-auto flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    {testCase.created_at ? new Date(testCase.created_at).toLocaleDateString('pt-BR') : 'N/A'}
+                  </div>
+                  <UserAvatar userId={testCase.user_id} />
+                </div>
+              </CardContent>
+            </Card>
+          )) : (
+            <div className="col-span-full text-center py-12">
+              <p className="text-muted-foreground">Nenhum resultado encontrado com os filtros atuais.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        // Lista em formato tabela
+        <div className="space-y-2">
+          {filteredCases.length > 0 ? (
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
+              {/* Header da tabela */}
+              <div className="grid grid-cols-[80px_4fr_2fr_2fr_2fr_80px_100px_72px] items-center gap-3 px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <div>ID</div>
+                <div>Título</div>
+                <div>Projeto</div>
+                <div>Prioridade</div>
+                <div>Tipo</div>
+                <div className="text-center">Criado por</div>
+                <div>Criado em</div>
+                <div className="flex justify-end">Ações</div>
+              </div>
+              
+              {/* Linhas da tabela */}
+              <div className="divide-y divide-border">
+                {paginatedCases.map((testCase) => (
+                  <div
+                    key={testCase.id}
+                    className="grid grid-cols-[80px_4fr_2fr_2fr_2fr_80px_100px_72px] items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => handleViewDetails(testCase)}
+                  >
+                    {/* ID */}
+                    <div>
+                      <span className="text-xs font-mono bg-brand/10 text-brand px-2 py-0.5 rounded">
+                        {`CT-${testCase.sequence ? String(testCase.sequence).padStart(3, '0') : (testCase.id?.slice(0, 4) || '----')}`}
+                      </span>
+                    </div>
+
+                    {/* Título + desc */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-sm font-medium text-foreground truncate leading-tight">{testCase.title}</span>
+                        {Boolean(testCase.generated_by_ai) && (
+                          <span title="Gerado por IA"><Sparkles className="h-3 w-3 text-amber-400 flex-shrink-0" /></span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate mt-0.5">{testCase.description || 'Sem descrição'}</div>
+                    </div>
+
+                    {/* Projeto */}
+                    <div>
+                      <ProjectDisplayField projectId={planProjectMap[testCase.plan_id] || ''} />
+                    </div>
+
+                    {/* Prioridade */}
+                    <div>
+                      <PriorityTag priority={testCase.priority} />
+                    </div>
+
+                    {/* Tipo */}
+                    <div className="text-xs text-muted-foreground">
+                      {testCaseTypeLabel(testCase.type)}
+                    </div>
+
+                    {/* Avatar */}
+                    <div className="flex justify-center">
+                      <UserAvatar userId={testCase.user_id} />
+                    </div>
+
+                    {/* Data */}
+                    <div className="text-xs text-muted-foreground">
+                      {testCase.created_at ? new Date(testCase.created_at).toLocaleDateString('pt-BR') : 'N/A'}
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center gap-0.5 justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(testCase);
+                        }}
+                        disabled={!currentProject || currentProject.status !== 'active'}
+                        title={!currentProject ? 'Selecione um projeto ativo para editar casos' : (currentProject.status !== 'active' ? 'Projeto não ativo — edição desabilitada' : undefined)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(testCase.id);
+                        }}
+                        className="h-8 w-8 p-0"
+                        disabled={!currentProject || isProjectInactive}
+                        title={!currentProject ? 'Selecione um projeto ativo para excluir casos' : (isProjectInactive ? 'Projeto não ativo — exclusão desabilitada' : undefined)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">Nenhum caso encontrado</h3>
+              <p className="text-muted-foreground mb-4">
+                Comece criando seu primeiro caso de teste
+              </p>
+              <StandardButton
+                variant="brand"
+                onClick={() => setShowForm(true)}
+                disabled={!currentProject || currentProject.status !== 'active'}
+                title={!currentProject ? 'Selecione um projeto ativo para criar casos' : (currentProject.status !== 'active' ? 'Projeto não ativo — criação desabilitada' : undefined)}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Primeiro Caso
+              </StandardButton>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalItems > 0 && (
+        <div className="flex items-center justify-between pt-4">
+          <div className="text-sm text-muted-foreground">
+            Mostrando {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalItems)} de {totalItems}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Itens por página:</span>
+            <select 
+              value={pageSize} 
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="px-3 py-1 border border-border rounded bg-background text-foreground text-sm"
+            >
+              <option value={9}>9</option>
+              <option value={15}>15</option>
+              <option value={30}>30</option>
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage >= totalPages}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Criação/Edição */}
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-auto-hide">
+          <DialogHeader>
+            <DialogTitle>
+              {editingCase ? 'Editar Caso de Teste' : 'Novo Caso de Teste'}
+            </DialogTitle>
+            <DialogDescription>
+              Preencha os campos para {editingCase ? 'atualizar' : 'criar'} um caso de teste.
+            </DialogDescription>
+          </DialogHeader>
+          <TestCaseForm 
+            initialData={editingCase}
+            onSuccess={editingCase ? handleCaseUpdated : handleCaseCreated}
+            onCancel={() => {
+              setShowForm(false);
+              setEditingCase(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Detalhes */}
+      <DetailModal
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedCase(null);
+          setSearchParams(prev => {
+            const np = new URLSearchParams(prev);
+            np.delete('id');
+            np.delete('modal');
+            return np;
+          });
+        }}
+        item={selectedCase}
+        type="case"
+        onEdit={handleEdit}
+        onDelete={(id) => handleDelete(id)}
+      />
+
+      {/* Confirm Delete Modal */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={(open) => {
+        setConfirmDeleteOpen(open);
+        if (!open) {
+          setDeletingCaseId(null);
+          setCaseLinkedCounts(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir caso de teste?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {caseLinkedCounts == null && 'Verificando dependências...'}
+              {caseLinkedCounts && (caseLinkedCounts.executionCount > 0 || caseLinkedCounts.defectCount > 0)
+                ? (
+                  <span>
+                    Este caso possui {caseLinkedCounts.executionCount} execução(ões) e {caseLinkedCounts.defectCount} defeito(s) vinculados.
+                    Remova essas dependências antes de excluir o caso para manter a integridade dos dados.
+                  </span>
+                ) : (caseLinkedCounts && 'Esta ação não pode ser desfeita. O caso será removido permanentemente.')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingCaseId(null)}>Cancelar</AlertDialogCancel>
+            {caseLinkedCounts && caseLinkedCounts.executionCount === 0 && caseLinkedCounts.defectCount === 0 && (
+              <AlertDialogAction onClick={performDeleteCase} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal IA para gerar caso */}
+      <Dialog open={showAIModal} onOpenChange={setShowAIModal}>
+        <DialogContent className="max-w-3xl overflow-x-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-amber-400" />
+              Gerar Caso de Teste com IA
+            </DialogTitle>
+            <DialogDescription className="sr-only">Gerar caso de teste com inteligência artificial</DialogDescription>
+          </DialogHeader>
+          <AIGeneratorForm initialType="case" hideTypeSelector={true} onSuccess={() => { setShowAIModal(false); loadCases(); }} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
