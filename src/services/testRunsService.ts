@@ -1,6 +1,6 @@
-﻿// Servico de Test Runs (Ciclos de Execucao). CRUD via /api/db + progresso via /api/runs/:id/progress.
+// Servico de Test Runs (Ciclos de Execucao). CRUD via /api/db + progresso via /api/runs/:id/progress.
 
-import { apiClient } from '@/lib/api';
+import { apiClient as supabase } from '@/lib/api';
 import type { TestRun, TestRunProgress } from '@/types';
 
 const TOKEN_KEY = 'krg_local_auth_token';
