@@ -269,8 +269,8 @@ export const TestRuns = () => {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Repeat className="h-6 w-6 text-amber-400" /> Ciclos de Execução
+          <h1 className="text-2xl font-bold">
+            Ciclos de Execução
           </h1>
           <p className="text-sm text-muted-foreground">
             Agrupa execuções por sprint, release ou janela de testes.

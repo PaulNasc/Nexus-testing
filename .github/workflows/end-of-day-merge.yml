@@ -1,0 +1,83 @@
+name: End of Day Automatic Merge
+
+on:
+  schedule:
+    # Executa todos os dias às 23:00 UTC (20:00 BRT / Horário de Brasília)
+    - cron: '0 23 * * *'
+  workflow_dispatch: # Permite execução manual pelo painel do GitHub Actions
+
+jobs:
+  merge-features:
+    name: Merge Active Features to Main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Busca todo o histórico para permitir merges corretos
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git User
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge active feature branches
+        run: |
+          git fetch --all
+          git checkout main
+          
+          # Encontra todas as branches remotas que comecem com origin/feature/
+          FEATURE_BRANCHES=$(git branch -r | grep 'origin/feature/' | sed 's/[[:space:]]*origin\///' | tr -d ' ')
+          
+          if [ -z "$FEATURE_BRANCHES" ]; then
+            echo "Nenhuma branch de feature encontrada no repositório remoto."
+            exit 0
+          fi
+          
+          echo "Branches de feature encontradas:"
+          echo "$FEATURE_BRANCHES"
+          
+          MERGED_ANY=false
+          
+          # Salvar o IFS original e definir para quebra de linha
+          OLD_IFS=$IFS
+          IFS=$'\n'
+          
+          for BRANCH in $FEATURE_BRANCHES; do
+            # Limpar espaços extras ou retornos de carro da string
+            BRANCH=$(echo "$BRANCH" | xargs)
+            [ -z "$BRANCH" ] && continue
+            
+            echo "------------------------------------------------"
+            echo "Analisando branch: $BRANCH"
+            
+            # Verifica se a branch existe e se tem commits a mais que a main
+            COMMITS_AHEAD=$(git log main..origin/$BRANCH --oneline 2>/dev/null | wc -l || echo 0)
+            
+            if [ "$COMMITS_AHEAD" -gt 0 ]; then
+              echo "A branch $BRANCH possui $COMMITS_AHEAD commit(s) à frente da main. Iniciando merge..."
+              
+              # Tenta fazer o merge sem commit rápido (no-ff) para manter histórico limpo
+              if git merge origin/$BRANCH --no-ff -m "ci: merge automático de fim de dia da branch $BRANCH [skip ci]"; then
+                echo "Merge da branch $BRANCH realizado localmente com sucesso."
+                MERGED_ANY=true
+              else
+                echo "ERRO: Conflito detectado ao mesclar $BRANCH. Abortando merge da branch atual."
+                git merge --abort
+              fi
+            else
+              echo "A branch $BRANCH já está totalmente sincronizada ou atrás da main. Nada a mesclar."
+            fi
+          done
+          
+          # Restaurar o IFS original
+          IFS=$OLD_IFS
+          
+          if [ "$MERGED_ANY" = true ]; then
+            echo "Enviando alterações mescladas para a main..."
+            git push origin main
+            echo "Push concluído com sucesso!"
+          else
+            echo "Nenhuma alteração pendente foi mesclada."
+          fi

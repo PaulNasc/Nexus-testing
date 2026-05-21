@@ -42,6 +42,10 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
+      {/* Fallback de título para acessibilidade (evita warning quando não há DialogTitle explícito) */}
+      <DialogPrimitive.Title className="sr-only">
+        Diálogo do Sistema
+      </DialogPrimitive.Title>
       {/* Fallback de descrição para acessibilidade (evita warning quando não há DialogDescription explícito) */}
       <DialogPrimitive.Description className="sr-only">
         Janela de diálogo do sistema.
