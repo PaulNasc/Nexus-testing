@@ -12,6 +12,7 @@ import { listTestRunsByProject } from '@/services/testRunsService';
 import { TestPlan, TestCase, AIModelTask, AIModel, TestRun } from '@/types';
 import { useProjectUsers } from '@/hooks/useProjectUsers';
 import { apiClient as supabase } from '@/lib/api';
+import { getCachedKeySync } from '@/services/apiKeysService';
 import * as ModelControlService from '@/services/modelControlService';
 import { cn } from '@/lib/utils';
 import { useAISettings } from '@/hooks/useAISettings';
@@ -110,14 +111,14 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
     return ['openai', 'anthropic', 'groq', 'gemini', 'openrouter'].includes(provider);
   };
 
-  // Detect if a model has a key stored
+  // Usa cache em memória do backend (populado no login via preloadAllKeys)
   const modelHasKey = (model: AIModel): boolean => {
     if (model.provider === 'ollama') return true;
-    try {
-      const host = window.location.hostname;
-      const keys = JSON.parse(localStorage.getItem(`${host}_mcp_api_keys`) || localStorage.getItem('mcp_api_keys') || '{}');
-      return Boolean(keys[model.id] || model.apiKey);
-    } catch { return Boolean(model.apiKey); }
+    return (
+      getCachedKeySync(model.provider, model.id) !== null ||
+      getCachedKeySync(model.provider, '') !== null ||
+      Boolean(model.apiKey)
+    );
   };
 
   const selectedModelObj = (formData.selectedModel === 'auto' || formData.selectedModel === 'default')
