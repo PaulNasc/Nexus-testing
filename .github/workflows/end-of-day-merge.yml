@@ -2,8 +2,8 @@ name: End of Day Automatic Merge
 
 on:
   schedule:
-    # Executa todos os dias às 23:00 UTC (20:00 BRT / Horário de Brasília)
-    - cron: '0 23 * * *'
+    # Executa todos os dias às 01:00 UTC (22:00 BRT / Horário de Brasília)
+    - cron: '0 1 * * *'
   workflow_dispatch: # Permite execução manual pelo painel do GitHub Actions
 
 jobs:

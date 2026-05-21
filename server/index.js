@@ -190,11 +190,19 @@ function buildWhere(filters = [], params = []) {
     const { type, column, value } = filter;
     if (!column || !/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(column)) continue;
     if (type === 'eq') {
-      params.push(value);
-      clauses.push(column + ' = \$' + params.length);
+      if (value === null) {
+        clauses.push(column + ' IS NULL');
+      } else {
+        params.push(value);
+        clauses.push(column + ' = \$' + params.length);
+      }
     } else if (type === 'neq') {
-      params.push(value);
-      clauses.push(column + ' <> \$' + params.length);
+      if (value === null) {
+        clauses.push(column + ' IS NOT NULL');
+      } else {
+        params.push(value);
+        clauses.push(column + ' <> \$' + params.length);
+      }
     } else if (type === 'gte') {
       params.push(value);
       clauses.push(column + ' >= \$' + params.length);
@@ -477,7 +485,71 @@ function getNextSequence(table, projectId = null) {
   _tableColsCache.clear();
 }
 
+
+// ─── SSE: Real-time notification push ────────────────────────────────────────
+/** userId → Set of active SSE response objects */
+const sseClients = new Map();
+
+function sseAdd(userId, res) {
+  if (!sseClients.has(userId)) sseClients.set(userId, new Set());
+  sseClients.get(userId).add(res);
+}
+
+function sseRemove(userId, res) {
+  const set = sseClients.get(userId);
+  if (!set) return;
+  set.delete(res);
+  if (set.size === 0) sseClients.delete(userId);
+}
+
+/** Push a notification payload to all open SSE connections for a user */
+function broadcastNotification(userId, payload) {
+  const set = sseClients.get(userId);
+  if (!set || set.size === 0) return;
+  const data = `data: ${JSON.stringify(payload)}\n\n`;
+  for (const res of set) {
+    try { res.write(data); } catch { /* client disconnected */ }
+  }
+}
+
+app.get('/api/notifications/stream', async (req, res) => {
+  // Auth: token can come from header OR ?token= query param (EventSource cannot set headers)
+  let user = await getCurrentUser(req);
+  if (!user && req.query.token) {
+    try {
+      const payload = jwt.verify(String(req.query.token), JWT_SECRET);
+      if (payload?.sub) {
+        const { rows } = query('SELECT id FROM profiles WHERE id = ? AND active = 1', [payload.sub]);
+        if (rows[0]) user = { id: rows[0].id };
+      }
+    } catch { /* invalid token */ }
+  }
+  if (!user) return res.status(401).json({ error: { message: 'Nao autorizado.' } });
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  // Send initial heartbeat
+  res.write(': connected\n\n');
+
+  sseAdd(user.id, res);
+
+  // Heartbeat every 30s to keep connection alive through proxies
+  const heartbeat = setInterval(() => {
+    try { res.write(': ping\n\n'); } catch { clearInterval(heartbeat); }
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseRemove(user.id, res);
+  });
+});
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
 
 app.post('/api/auth/login', authRateLimit, async (req, res, next) => {
   try {
@@ -777,14 +849,20 @@ app.post('/api/db/mutate', requireUser, async (req, res, next) => {
           allInserted.push(...(r.rows || []));
         }
         result = { rows: allInserted, rowCount: allInserted.length };
+
+        // Broadcast new notifications in real-time via SSE
+        if (table === 'notifications') {
+          for (const inserted of allInserted) {
+            if (inserted.user_id) {
+              broadcastNotification(inserted.user_id, { type: 'notification', payload: inserted });
+            }
+          }
+        }
       } else if (action === 'update') {
-        // Validacao de payload (campos presentes)
         const errV = validateRow(table, values, { isUpdate: true });
         if (errV) return res.status(400).json({ error: { message: `Validacao (${table}): ${errV}` } });
 
-        // State machine: bloqueia transicoes invalidas em defects/requirements/test_runs
         if ((table === 'defects' || table === 'requirements' || table === 'test_runs') && values?.status) {
-          // Busca registro(s) afetado(s) para comparar status atual
           const preParams = [];
           const preWhere = buildWhere(filters, preParams);
           const { rows: preRows } = query('SELECT id, status FROM ' + table + preWhere, preParams);
@@ -807,7 +885,7 @@ app.post('/api/db/mutate', requireUser, async (req, res, next) => {
           return res.status(400).json({ error: { message: `Nenhum campo valido para atualizar em '${table}'.` } });
         }
         const params = [];
-        const setSql = entries.map(([key, val]) => { params.push(val); return key + ' = \$' + params.length; }).join(', ');
+        const setSql = entries.map(([key, val]) => { params.push(val); return key + ' = $' + params.length; }).join(', ');
         const whereSql = buildWhere(filters, params);
         result = client.query('UPDATE ' + table + ' SET ' + setSql + whereSql + ' RETURNING *', params);
       } else if (action === 'delete') {

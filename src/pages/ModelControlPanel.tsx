@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { saveApiKey, preloadAllKeys, getCachedKeySync } from '@/services/apiKeysService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,7 +70,7 @@ export const ModelControlPanel = () => {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<AIModelConfig | null>(null);
   const [openSections, setOpenSections] = useState({ models: true, templates: false, tests: false });
-  const [activeTab, setActiveTab] = useState<'models' | 'templates' | 'tests' | 'settings'>('models');
+  const [activeTab, setActiveTab] = useState<'models' | 'templates' | 'tests'>('models');
   const { settings: aiSettings, updateSettings: updateAISettings } = useAISettings();
 
   // Models list state
@@ -124,20 +125,23 @@ export const ModelControlPanel = () => {
             local = merged;
             ModelControlService.saveConfig(merged);
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[MCP] Remote load failed, using local config:', e);
+        }
       }
       setConfig(local);
     } finally { setLoading(false); }
   };
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
+  // Verifica se há chave configurada: primeiro no cache em memória do backend, depois no modelo local
   const modelHasKey = (model: AIModel): boolean => {
     if (model.provider === 'ollama') return true;
-    try {
-      const host = window.location.hostname;
-      const keys = JSON.parse(localStorage.getItem(`${host}_mcp_api_keys`) || localStorage.getItem('mcp_api_keys') || '{}');
-      return Boolean(keys[model.id] || model.apiKey);
-    } catch { return Boolean(model.apiKey); }
+    return (
+      getCachedKeySync(model.provider, model.id) !== null ||
+      getCachedKeySync(model.provider, '') !== null ||
+      Boolean(model.apiKey)
+    );
   };
 
   const refreshConfig = () => setConfig(ModelControlService.loadConfig());
@@ -168,10 +172,23 @@ export const ModelControlPanel = () => {
     updateInlineForm(modelId, { capabilities: next });
   };
 
-  const saveInlineModel = (modelId: string) => {
+  const saveInlineModel = async (modelId: string) => {
     const form = inlineForms[modelId];
     if (!form) return;
-    ModelControlService.updateModel(modelId, form);
+    // Persiste a chave da API no backend (criptografada) se o usuário preencheu
+    if (form.apiKey && form.provider && providerRequiresApiKey(form.provider as AIModel['provider'])) {
+      try {
+        await saveApiKey(form.provider, form.apiKey, modelId);
+        await preloadAllKeys();
+      } catch (e) {
+        console.warn('[MCP] Falha ao salvar chave no backend:', e);
+      }
+      // Não armazenar apiKey em texto no localStorage — limpa do form antes de salvar config local
+      const { apiKey: _dropped, ...formWithoutKey } = form;
+      ModelControlService.updateModel(modelId, formWithoutKey);
+    } else {
+      ModelControlService.updateModel(modelId, form);
+    }
     refreshConfig();
     closeInlineForm(modelId);
   };
@@ -209,9 +226,22 @@ export const ModelControlPanel = () => {
     setNewModelForm(p => ({ ...p, capabilities: caps.includes(capId) ? caps.filter(c => c !== capId) : [...caps, capId] }));
   };
 
-  const saveNewModel = () => {
+  const saveNewModel = async () => {
     if (!newModelForm.name?.trim()) return;
-    ModelControlService.addModel(newModelForm as Omit<AIModel, 'id'>);
+    const provider = newModelForm.provider as AIModel['provider'] | undefined;
+    const apiKey = newModelForm.apiKey;
+    // Adiciona o modelo sem a apiKey em texto plano na config local
+    const { apiKey: _dropped, ...formWithoutKey } = newModelForm;
+    const added = ModelControlService.addModel(formWithoutKey as Omit<AIModel, 'id'>);
+    // Persiste a chave no backend se fornecida
+    if (apiKey && provider && providerRequiresApiKey(provider)) {
+      try {
+        await saveApiKey(provider, apiKey, added.id);
+        await preloadAllKeys();
+      } catch (e) {
+        console.warn('[MCP] Falha ao salvar chave do novo modelo:', e);
+      }
+    }
     refreshConfig();
     setAddingModel(false);
     setNewModelForm({});
@@ -262,17 +292,19 @@ export const ModelControlPanel = () => {
       const model = overrideModelId ? config?.models.find(m => m.id === overrideModelId) : resolveModelForTest();
       if (!model) throw new Error('Nenhum modelo selecionado');
 
-      // Lê a chave salva no localStorage (igual ao modelControlService)
-      const host = window.location.hostname;
-      const storedKeys: Record<string, string> = JSON.parse(
-        localStorage.getItem(`${host}_mcp_api_keys`) || localStorage.getItem('mcp_api_keys') || '{}'
-      );
-      const resolvedKey = testApiKey.trim() || storedKeys[model.id] || model.apiKey || '';
+      // Resolve a chave: usa a digitada no campo de teste ou a que está no cache do backend
+      const typedKey = testApiKey.trim();
+      const cachedKey = getCachedKeySync(model.provider, model.id) || getCachedKeySync(model.provider, '') || '';
+      const resolvedKey = typedKey || cachedKey || model.apiKey || '';
 
-      // Se o usuário digitou uma chave de teste, persiste para uso futuro
-      if (testApiKey.trim() && providerRequiresApiKey(model.provider)) {
-        storedKeys[model.id] = testApiKey.trim();
-        localStorage.setItem(`${host}_mcp_api_keys`, JSON.stringify(storedKeys));
+      // Se o usuário digitou uma chave de teste, persiste no backend (criptografada)
+      if (typedKey && providerRequiresApiKey(model.provider)) {
+        try {
+          await saveApiKey(model.provider, typedKey, model.id);
+          await preloadAllKeys();
+        } catch (e) {
+          console.warn('[MCP] Falha ao persistir chave de teste:', e);
+        }
         refreshConfig();
       }
 
@@ -351,7 +383,7 @@ export const ModelControlPanel = () => {
             <div className="flex gap-2">
               <Input type={showApiKeyFor[modelId] ? 'text' : 'password'} value={form.apiKey || ''} onChange={e => updateInlineForm(modelId, { apiKey: e.target.value })} className="h-8 text-sm font-mono flex-1" placeholder="sk-..." />
               <Button type="button" variant="outline" size="sm" onClick={() => setShowApiKeyFor(p => ({ ...p, [modelId]: !p[modelId] }))}>{showApiKeyFor[modelId] ? 'Ocultar' : 'Mostrar'}</Button>
-              <Button type="button" variant="secondary" size="sm" disabled={fetchingModels[modelId]} onClick={() => handleFetchModels(modelId, provider, form.apiKey || '', (form.settings?.baseUrl as string) || '')}>
+              <Button type="button" variant="outline" size="sm" disabled={fetchingModels[modelId]} onClick={() => handleFetchModels(modelId, provider, form.apiKey || '', (form.settings?.baseUrl as string) || '')}>
                 {fetchingModels[modelId] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                 <span className="ml-1 hidden sm:inline">Buscar Modelos</span>
               </Button>
@@ -379,9 +411,16 @@ export const ModelControlPanel = () => {
                 <>
                   <Input value={provider === 'gemini' ? (form.id || modelId) : ((form.settings?.apiModel as string) || '')} onChange={e => provider === 'gemini' ? updateInlineForm(modelId, { id: e.target.value }) : patchSettings({ apiModel: e.target.value })} className="h-8 text-sm font-mono" placeholder={provider === 'gemini' ? 'gemini-2.0-flash' : (PROVIDER_SUGGESTIONS[provider]?.[0] || '')} />
                   {PROVIDER_SUGGESTIONS[provider]?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {PROVIDER_SUGGESTIONS[provider].map(s => (
-                        <button key={s} type="button" className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-accent border text-muted-foreground" onClick={() => provider === 'gemini' ? updateInlineForm(modelId, { id: s }) : patchSettings({ apiModel: s })}>{s}</button>
+                        <button 
+                          key={s} 
+                          type="button" 
+                          className="text-xs px-2.5 py-0.5 rounded-full border border-border bg-transparent text-muted-foreground hover:text-brand hover:border-brand/40 transition-all font-mono" 
+                          onClick={() => provider === 'gemini' ? updateInlineForm(modelId, { id: s }) : patchSettings({ apiModel: s })}
+                        >
+                          {s}
+                        </button>
                       ))}
                     </div>
                   )}
@@ -432,7 +471,7 @@ export const ModelControlPanel = () => {
             <Label className="text-xs">Base URL (Ollama)</Label>
             <div className="flex gap-2">
               <Input value={(form.settings?.baseUrl as string) || 'http://localhost:11434'} onChange={e => patchSettings({ baseUrl: e.target.value })} className="h-8 text-sm flex-1" />
-              <Button type="button" variant="secondary" size="sm" disabled={fetchingModels[modelId]} onClick={() => handleFetchModels(modelId, 'ollama', '', (form.settings?.baseUrl as string) || 'http://localhost:11434')}>
+              <Button type="button" variant="outline" size="sm" disabled={fetchingModels[modelId]} onClick={() => handleFetchModels(modelId, 'ollama', '', (form.settings?.baseUrl as string) || 'http://localhost:11434')}>
                 {fetchingModels[modelId] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                 <span className="ml-1 hidden sm:inline">Buscar Modelos</span>
               </Button>
@@ -453,8 +492,8 @@ export const ModelControlPanel = () => {
         </div>
 
         {relatedTemplates.length > 0 && (
-          <div className="rounded-md bg-blue-50 dark:bg-blue-950/40 p-3">
-            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Templates associados ({relatedTemplates.length})</p>
+          <div className="rounded-md bg-brand/5 border border-brand/10 dark:bg-brand/10 p-3">
+            <p className="text-xs font-medium text-brand/80 dark:text-brand/90 mb-1">Templates associados ({relatedTemplates.length})</p>
             <div className="flex flex-wrap gap-1">
               {relatedTemplates.map(t => (
                 <Badge key={t.id} variant="secondary" className="text-xs">{t.name}</Badge>
@@ -519,7 +558,7 @@ export const ModelControlPanel = () => {
               <div className="flex gap-2">
                 <Input type={showNewApiKey ? 'text' : 'password'} value={form.apiKey || ''} onChange={e => setNewModelForm(p => ({ ...p, apiKey: e.target.value }))} className="h-8 text-sm font-mono flex-1" placeholder="sk-..." />
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowNewApiKey(v => !v)}>{showNewApiKey ? 'Ocultar' : 'Mostrar'}</Button>
-                <Button type="button" variant="secondary" size="sm" disabled={fetchingModels['new']} onClick={() => handleFetchModels('new', provider, form.apiKey || '', (form.settings?.baseUrl as string) || '')}>
+                <Button type="button" variant="outline" size="sm" disabled={fetchingModels['new']} onClick={() => handleFetchModels('new', provider, form.apiKey || '', (form.settings?.baseUrl as string) || '')}>
                   {fetchingModels['new'] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                   <span className="ml-1 hidden sm:inline">Buscar Modelos</span>
                 </Button>
@@ -547,9 +586,16 @@ export const ModelControlPanel = () => {
                   <Input value={(form.settings?.apiModel as string) || ''} onChange={e => patchSettings({ apiModel: e.target.value })} className="h-8 text-sm font-mono" placeholder={PROVIDER_SUGGESTIONS[provider]?.[0] || (provider === 'gemini' ? 'gemini-2.0-flash' : '')} />
                   <p className="text-xs text-muted-foreground mt-0.5">Insira a chave e clique em "Buscar Modelos" para ver a lista disponível.</p>
                   {PROVIDER_SUGGESTIONS[provider]?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {PROVIDER_SUGGESTIONS[provider].map(s => (
-                        <button key={s} type="button" className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-accent border text-muted-foreground" onClick={() => patchSettings({ apiModel: s })}>{s}</button>
+                        <button 
+                          key={s} 
+                          type="button" 
+                          className="text-xs px-2.5 py-0.5 rounded-full border border-border bg-transparent text-muted-foreground hover:text-brand hover:border-brand/40 transition-all font-mono" 
+                          onClick={() => patchSettings({ apiModel: s })}
+                        >
+                          {s}
+                        </button>
                       ))}
                     </div>
                   )}
@@ -563,7 +609,7 @@ export const ModelControlPanel = () => {
               <Label className="text-xs">Base URL (Ollama)</Label>
               <div className="flex gap-2">
                 <Input value={(form.settings?.baseUrl as string) || 'http://localhost:11434'} onChange={e => patchSettings({ baseUrl: e.target.value })} className="h-8 text-sm flex-1" />
-                <Button type="button" variant="secondary" size="sm" disabled={fetchingModels['new']} onClick={() => handleFetchModels('new', 'ollama', '', (form.settings?.baseUrl as string) || 'http://localhost:11434')}>
+                <Button type="button" variant="outline" size="sm" disabled={fetchingModels['new']} onClick={() => handleFetchModels('new', 'ollama', '', (form.settings?.baseUrl as string) || 'http://localhost:11434')}>
                   {fetchingModels['new'] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
                   <span className="ml-1 hidden sm:inline">Buscar Modelos</span>
                 </Button>
@@ -582,7 +628,7 @@ export const ModelControlPanel = () => {
               ))}
             </div>
             {caps.length > 0 && (
-              <div className="mt-2 rounded-md bg-blue-50 dark:bg-blue-950/40 p-2 text-xs text-blue-700 dark:text-blue-300">
+              <div className="mt-2 rounded-md bg-brand/5 border border-brand/10 dark:bg-brand/10 p-2 text-xs text-brand/80 dark:text-brand/90">
                 Templates disponíveis: {config?.promptTemplates.filter(t => caps.includes(t.task)).map(t => t.name).join(', ') || '—'}
               </div>
             )}
@@ -643,43 +689,42 @@ export const ModelControlPanel = () => {
             <TabsTrigger value="models">Modelos</TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="tests">Testes</TabsTrigger>
-            <TabsTrigger value="settings">Configurações</TabsTrigger>
           </TabsList>
 
           {/* ═══════════════════════════════════════════════════════════════ */}
           {/* TAB: MODELOS                                                    */}
           {/* ═══════════════════════════════════════════════════════════════ */}
-          <TabsContent value="models">
-            <Collapsible open={openSections.models} onOpenChange={() => setOpenSections(s => ({ ...s, models: !s.models }))} className="border rounded-lg">
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-brand" />
-                    <h3 className="text-lg font-semibold">Modelos</h3>
+          <TabsContent value="models" className="space-y-4">
+            <Card className="border rounded-lg bg-card text-card-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Sparkles className="h-5 w-5 text-brand" />
+                  <CardTitle className="text-lg font-semibold">Modelos</CardTitle>
+                  <div className="flex items-center gap-1.5 ml-2">
                     <Badge variant="secondary">
                       {hideInactive && visibleModelsCount !== totalModelsCount
                         ? `${visibleModelsCount} visíveis de ${totalModelsCount}`
                         : `${totalModelsCount} cadastrados`}
                     </Badge>
-                    <Badge variant="outline" className="text-green-600 border-green-600">{activeModelsWithKey} prontos</Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 mr-2">
-                      <Checkbox
-                        id="hide-inactive"
-                        checked={hideInactive}
-                        onCheckedChange={(checked) => setHideInactive(checked === true)}
-                      />
-                      <Label htmlFor="hide-inactive" className="text-sm cursor-pointer">Ocultar inativos</Label>
-                    </div>
-                    <Button size="sm" className="flex items-center gap-1" onClick={e => { e.stopPropagation(); startAddingModel(); }} disabled={!hasPermission('can_configure_ai_models')}>
-                      <Plus className="h-3.5 w-3.5" /><span className="hidden sm:inline">Adicionar</span>
-                    </Button>
+                    <Badge variant="outline" className="text-success border-success/30 bg-success/10">{activeModelsWithKey} prontos</Badge>
                   </div>
                 </div>
-              </CollapsibleTrigger>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="hide-inactive"
+                      checked={hideInactive}
+                      onCheckedChange={(checked) => setHideInactive(checked === true)}
+                    />
+                    <Label htmlFor="hide-inactive" className="text-sm cursor-pointer font-normal text-muted-foreground">Ocultar inativos</Label>
+                  </div>
+                  <Button size="sm" className="flex items-center gap-1" onClick={startAddingModel} disabled={!hasPermission('can_configure_ai_models')}>
+                    <Plus className="h-3.5 w-3.5" /><span className="hidden sm:inline">Adicionar</span>
+                  </Button>
+                </div>
+              </CardHeader>
 
-              <CollapsibleContent className="p-4 pt-0 space-y-3">
+              <CardContent className="p-4 pt-0 space-y-3">
                 {/* Add new model form */}
                 {addingModel && renderNewModelForm()}
 
@@ -714,15 +759,19 @@ export const ModelControlPanel = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               <span className="font-medium text-sm truncate">{model.name}</span>
-                              {hasKey && <span title="Chave configurada"><Check className="h-3 w-3 text-green-500 flex-shrink-0" /></span>}
+                              {hasKey && <span title="Chave configurada"><Check className="h-3 w-3 text-success flex-shrink-0" /></span>}
                               {!model.active && <Badge variant="secondary" className="text-xs">Inativo</Badge>}
                             </div>
                             <div className="flex flex-wrap gap-1 mt-0.5">
                               {model.capabilities.slice(0, 3).map(c => (
-                                <span key={c} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{capLabel(c)}</span>
+                                <Badge key={c} variant="secondary" className="text-[10px] font-medium px-2 py-0.5 border border-border/40">
+                                  {capLabel(c)}
+                                </Badge>
                               ))}
                               {model.capabilities.length > 3 && (
-                                <span className="text-xs text-muted-foreground">+{model.capabilities.length - 3}</span>
+                                <Badge variant="outline" className="text-[10px] text-muted-foreground px-2 py-0.5">
+                                  +{model.capabilities.length - 3}
+                                </Badge>
                               )}
                             </div>
                           </div>
@@ -793,28 +842,26 @@ export const ModelControlPanel = () => {
                     ))}
                   </CardContent>
                 </Card>
-              </CollapsibleContent>
-            </Collapsible>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ═══════════════════════════════════════════════════════════════ */}
           {/* TAB: TEMPLATES                                                  */}
           {/* ═══════════════════════════════════════════════════════════════ */}
-          <TabsContent value="templates">
-            <Collapsible open={openSections.templates} onOpenChange={() => setOpenSections(s => ({ ...s, templates: !s.templates }))} className="border rounded-lg">
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    <h3 className="text-lg font-semibold">Templates</h3>
-                    <Badge variant="secondary">{config?.promptTemplates.length ?? 0}</Badge>
-                  </div>
-                  <Button size="sm" onClick={e => { e.stopPropagation(); setEditingTemplateId('new'); setTemplateForm({ name: '', task: 'test-plan-generation', template: '', description: '', parameters: [], active: true }); }} disabled={!hasPermission('can_configure_ai_models')}>
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
-                  </Button>
+          <TabsContent value="templates" className="space-y-4">
+            <Card className="border rounded-lg bg-card text-card-foreground">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-brand" />
+                  <CardTitle className="text-lg font-semibold">Templates</CardTitle>
+                  <Badge variant="secondary" className="ml-2">{config?.promptTemplates.length ?? 0}</Badge>
                 </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="p-4 pt-0 space-y-4">
+                <Button size="sm" onClick={() => { setEditingTemplateId('new'); setTemplateForm({ name: '', task: 'test-plan-generation', template: '', description: '', parameters: [], active: true }); }} disabled={!hasPermission('can_configure_ai_models')}>
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-4">
                 {/* Filters */}
                 <div className="flex gap-3">
                   <div className="w-52">
@@ -890,7 +937,7 @@ export const ModelControlPanel = () => {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm">{t.name}</span>
                             <Badge variant="outline" className="text-xs">{TASK_LABELS[t.task] ?? t.task}</Badge>
-                            {t.active ? <Badge className="text-xs bg-green-100 text-green-800 border-green-200">Ativo</Badge> : <Badge variant="secondary" className="text-xs">Inativo</Badge>}
+                            {t.active ? <Badge variant="outline" className="text-xs text-success border-success/30 bg-success/10">Ativo</Badge> : <Badge variant="secondary" className="text-xs">Inativo</Badge>}
                           </div>
                           {t.description && <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>}
                           {t.parameters?.length > 0 && (
@@ -908,21 +955,22 @@ export const ModelControlPanel = () => {
                       </div>
                     ))}
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ═══════════════════════════════════════════════════════════════ */}
           {/* TAB: TESTES                                                     */}
           {/* ═══════════════════════════════════════════════════════════════ */}
-          <TabsContent value="tests">
-            <Collapsible open={openSections.tests} onOpenChange={() => setOpenSections(s => ({ ...s, tests: !s.tests }))} className="border rounded-lg">
-              <CollapsibleTrigger asChild>
-                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
-                  <div className="flex items-center gap-2"><Zap className="h-5 w-5 text-yellow-500" /><h3 className="text-lg font-semibold">Testar Conexão</h3></div>
+          <TabsContent value="tests" className="space-y-4">
+            <Card className="border rounded-lg bg-card text-card-foreground">
+              <CardHeader className="p-4 pb-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-brand" />
+                  <CardTitle className="text-lg font-semibold">Testar Conexão</CardTitle>
                 </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="p-4 pt-0 space-y-4">
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-xs">Modelo para Teste</Label>
@@ -962,9 +1010,9 @@ export const ModelControlPanel = () => {
                 </Button>
 
                 {testResult && (
-                  <Alert variant={testResult.success ? 'default' : 'destructive'} className={testResult.success ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : ''}>
+                  <Alert variant={testResult.success ? 'default' : 'destructive'} className={testResult.success ? 'border-success/30 bg-success/10 text-success' : ''}>
                     <div className="flex items-start gap-2">
-                      {testResult.success ? <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" /> : <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
+                      {testResult.success ? <CheckCircle className="h-4 w-4 text-success mt-0.5 flex-shrink-0" /> : <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
                       <AlertDescription className="text-sm">
                         <p className="font-medium">{testResult.message}</p>
                         {testResult.modelUsed && <p className="text-xs opacity-70 mt-0.5">Modelo: {testResult.modelUsed}</p>}
@@ -974,62 +1022,10 @@ export const ModelControlPanel = () => {
                     </div>
                   </Alert>
                 )}
-              </CollapsibleContent>
-            </Collapsible>
+              </CardContent>
+            </Card>
           </TabsContent>
 
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          {/* TAB: CONFIGURAÇÕES                                                   */}
-          {/* ═══════════════════════════════════════════════════════════════ */}
-          <TabsContent value="settings">
-            <div className="border rounded-lg p-5 space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold mb-1">Geração em Lote</h3>
-                <p className="text-xs text-muted-foreground mb-4">Controla o modo padrão ao abrir o gerador de IA nas páginas.</p>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm">Gerar planos em lote</Label>
-                      <p className="text-xs text-muted-foreground">Habilita o modo lote para Planos de Teste no gerador IA</p>
-                    </div>
-                    <Switch
-                      checked={aiSettings.batchGenerationEnabled}
-                      onCheckedChange={v => updateAISettings({ batchGenerationEnabled: v })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm">Gerar casos em lote</Label>
-                      <p className="text-xs text-muted-foreground">Habilita o modo lote para Casos de Teste no gerador IA</p>
-                    </div>
-                    <Switch
-                      checked={aiSettings.batchCaseGenerationEnabled}
-                      onCheckedChange={v => updateAISettings({ batchCaseGenerationEnabled: v })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold mb-1">Modelo Preferido</h3>
-                <p className="text-xs text-muted-foreground mb-3">Modelo padrão selecionado automaticamente ao abrir o gerador.</p>
-                <Select
-                  value={aiSettings.preferredModel || 'default'}
-                  onValueChange={v => updateAISettings({ preferredModel: v })}
-                >
-                  <SelectTrigger className="h-8 text-sm w-64">
-                    <SelectValue placeholder="Automático" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">Automático (seleção inteligente)</SelectItem>
-                    {(config?.models || []).filter(m => m.active).map(m => (
-                      <SelectItem key={m.id} value={m.id}>{m.name} <span className="text-muted-foreground ml-1">({providerLabel(m.provider)})</span></SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </TabsContent>
         </Tabs>
       </div>
     </PermissionGuard>
