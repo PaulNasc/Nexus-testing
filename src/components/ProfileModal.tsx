@@ -41,6 +41,14 @@ const roleLabels: Record<UserRole, string> = {
   viewer: 'Visualizador',
 };
 
+const ROLE_BADGE_STYLES: Record<UserRole, { badge: string; icon: string }> = {
+  master:  { badge: 'bg-amber-500/10  text-amber-500  border-amber-500/25',    icon: 'text-amber-500'  },
+  admin:   { badge: 'bg-red-500/10    text-red-500    border-red-500/25',      icon: 'text-red-500'    },
+  manager: { badge: 'bg-blue-500/10   text-blue-500   border-blue-500/25',     icon: 'text-blue-500'   },
+  tester:  { badge: 'bg-green-500/10  text-green-500  border-green-500/25',    icon: 'text-green-500'  },
+  viewer:  { badge: 'bg-muted/50 text-muted-foreground border-border/50',      icon: 'text-muted-foreground' },
+};
+
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -388,10 +396,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <h3 className="text-xl font-bold">{displayName || 'Usuário'}</h3>
               <p className="text-sm text-muted-foreground">{email}</p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-brand/10 text-brand border border-brand/20 uppercase tracking-widest transition-all">
-                  <Shield className="h-3 w-3 fill-brand/20" />
-                  ( {roleName} )
-                </span>
+                {(() => {
+                  const r = ((profile?.role || role || 'viewer') as UserRole);
+                  const style = ROLE_BADGE_STYLES[r] || ROLE_BADGE_STYLES.viewer;
+                  return (
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-widest ${style.badge}`}>
+                      <Shield className={`h-3 w-3 ${style.icon}`} />
+                      {roleName}
+                    </span>
+                  );
+                })()}
                 {requestedRoles.map((r, idx) => {
                   const icons: Record<string, any> = {
                     desenvolvimento: Code, suporte: LifeBuoy, gerencia: Briefcase, supervisao: Shield, visualizador: Eye
@@ -399,9 +413,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   const IconC = icons[r] || Code;
                   const label = r.charAt(0).toUpperCase() + r.slice(1);
                   return (
-                    <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-brand/10 text-brand border border-brand/20 uppercase tracking-widest transition-all">
-                      <IconC className="h-3 w-3 fill-brand/20" />
-                      ( {label} )
+                    <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-muted/40 text-foreground/70 border border-border/50 uppercase tracking-widest">
+                      <IconC className="h-3 w-3" />
+                      {label}
                     </span>
                   );
                 })}
