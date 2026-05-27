@@ -970,9 +970,19 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
 
             return (
               <>
+                {gridItems.length > 0 && (
+                  <div className="md:columns-2 md:gap-5 space-y-5 md:space-y-0">
+                    {gridItems.map((field) => (
+                      <div key={field.label} className="break-inside-avoid md:mb-5">
+                        <h3 className="text-sm font-semibold text-foreground mb-1.5">{field.label}</h3>
+                        {renderListOrParagraph(field.content)}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {allBranchGroups.length > 0 && (
-                  <Collapsible defaultOpen={false} className="rounded-lg border border-brand/30 bg-brand/5 p-3.5 group mb-5">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity">
+                  <Collapsible defaultOpen={false} className="rounded-lg border border-border/50 bg-muted/20 p-3.5 group mt-4">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity" aria-label={`Branches de Entrega — ${totalBranches} branch${totalBranches !== 1 ? 'es' : ''}`}>
                       <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                         <span className="h-2 w-2 rounded-full bg-brand inline-block" />
                         Branches de Entrega
@@ -991,6 +1001,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                               <button
                                 key={bi}
                                 type="button"
+                                aria-label={`Copiar branch ${b}`}
                                 className="inline-flex items-center gap-1 rounded-md bg-brand/10 border border-brand/20 hover:bg-brand/20 active:scale-95 transition px-2 py-0.5 text-xs font-mono text-brand cursor-copy"
                                 title={`Copiar ${b}`}
                                 onClick={(e) => {
@@ -1010,16 +1021,6 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                     </CollapsibleContent>
                   </Collapsible>
                 )}
-                {gridItems.length > 0 && (
-                  <div className="md:columns-2 md:gap-5 space-y-5 md:space-y-0">
-                    {gridItems.map((field) => (
-                      <div key={field.label} className="break-inside-avoid md:mb-5">
-                        <h3 className="text-sm font-semibold text-foreground mb-1.5">{field.label}</h3>
-                        {renderListOrParagraph(field.content)}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </>
             );
           })()}
@@ -1031,31 +1032,6 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
             const branchTokens = rawBranches.split(/[\s,;]+/).map((b: string) => b.trim()).filter(isValidBranchToken);
             return (
             <div className="space-y-4">
-              {branchTokens.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">Branch</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {branchTokens.map((b: string, i: number) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(b);
-                            toast({ title: 'Branch copiada', description: b });
-                          } catch {
-                            toast({ title: 'Falha ao copiar', description: b, variant: 'destructive' });
-                          }
-                        }}
-                        title={`Copiar ${b}`}
-                        className="inline-flex items-center gap-1 rounded-md bg-brand/10 border border-brand/20 hover:bg-brand/20 active:scale-95 transition px-2 py-0.5 text-xs font-mono text-brand cursor-pointer"
-                      >
-                        <span className="opacity-60">#</span>{b}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
               {item.preconditions && (
                 <div>
                   <h3 className="text-sm font-semibold text-foreground mb-1.5">Pré-condições</h3>
@@ -1080,6 +1056,35 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                 <div>
                   <h3 className="text-sm font-semibold text-foreground mb-1.5">Resultado Final Esperado</h3>
                   {renderListOrParagraph(item.expected_result)}
+                </div>
+              )}
+              {branchTokens.length > 0 && (
+                <div className="rounded-lg border border-border/50 bg-muted/20 p-3.5">
+                  <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-brand inline-block" />
+                    Branch
+                  </h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    {branchTokens.map((b: string, i: number) => (
+                      <button
+                        key={i}
+                        type="button"
+                        aria-label={`Copiar branch ${b}`}
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(b);
+                            toast({ title: 'Branch copiada', description: b });
+                          } catch {
+                            toast({ title: 'Falha ao copiar', description: b, variant: 'destructive' });
+                          }
+                        }}
+                        title={`Copiar ${b}`}
+                        className="inline-flex items-center gap-1 rounded-md bg-brand/10 border border-brand/20 hover:bg-brand/20 active:scale-95 transition px-2 py-0.5 text-xs font-mono text-brand cursor-pointer"
+                      >
+                        <span className="opacity-60">#</span>{b}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
