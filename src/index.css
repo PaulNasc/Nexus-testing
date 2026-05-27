@@ -59,59 +59,72 @@
   :root {
     /* Garantir que o body use Inter como fonte padrão (carregada em index.html) */
     --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
 
+    /*
+     * Light Mode — Estratégia de superfícies (padrão Notion / Linear / Vercel)
+     * background: cinza muito sutil, não branco puro → conforto visual
+     * card: branco sobre o fundo → hierarquia de profundidade
+     * muted: levemente mais escuro que background → separação sutil
+     */
+
+    /* Base: cinza cálido levíssimo — hsl(220, 14%, 96%) ≈ #F3F4F6 */
+    --background: 220 14% 96%;
+    --foreground: 222 39% 11%;          /* #141c2f — quase preto, confortável */
+
+    /* Superfícies: branco puro para cards sobre fundo cinza */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 39% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 39% 11%;
 
     /* Primária (turquesa) para tema claro */
-    /* #00C2A8 = hsl(172 100% 38%), hover: #00E5C0 = hsl(168 100% 45%) */
-    --primary: 172 100% 38%;
+    --primary: 172 100% 34%;            /* #00B09A — ligeiramente mais escura para contraste no claro */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secundária: fundo de chips/badges */
+    --secondary: 220 14% 91%;
+    --secondary-foreground: 222 39% 22%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted: levemente mais escuro que o background */
+    --muted: 220 14% 91%;
+    --muted-foreground: 220 9% 46%;     /* #6B7280 — cinza médio legível */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 220 14% 91%;
+    --accent-foreground: 222 39% 22%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 172 100% 38%;
+    /* Bordas: mais visíveis no claro para delimitar sem sombras pesadas */
+    --border: 220 13% 84%;              /* #D1D5DB */
+    --input: 220 13% 84%;
+    --ring: 172 100% 34%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-    /* semantic tokens for redesign (light) */
-    --brand: 172 100% 38%; /* #00C2A8 */
-    --brand-hover: 168 100% 45%; /* #00E5C0 */
-    /* Texto dos botões (preto) */
-    --brand-foreground: 0 0% 10%;
-    --info: 199 89% 48%;
-    --info-foreground: 210 40% 98%;
-    --success: 142 71% 45%; /* verde suave para sucesso */
-    --success-foreground: 140 5% 10%;
-    --warning: 46 92% 63%; /* #F7C948 dourado */
-    --warning-foreground: 0 0% 12%;
-    --neutral: 210 6% 93%;
-    --neutral-foreground: 222.2 47.4% 11.2%;
+    /* Sidebar: levemente mais escura que o background para separação visual */
+    --sidebar-background: 220 16% 92%; /* #E8EAF0 */
+    --sidebar-foreground: 222 39% 20%;
+    --sidebar-primary: 172 100% 34%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 88%;
+    --sidebar-accent-foreground: 222 39% 22%;
+    --sidebar-border: 220 13% 82%;
+    --sidebar-ring: 172 100% 34%;
+
+    /* semantic tokens (light) */
+    --brand: 172 100% 34%;
+    --brand-hover: 172 100% 40%;
+    --brand-foreground: 0 0% 100%;
+    --info: 210 90% 52%;
+    --info-foreground: 0 0% 100%;
+    --success: 142 71% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;              /* âmbar escuro — visível no claro */
+    --warning-foreground: 0 0% 10%;
+    --neutral: 220 13% 88%;
+    --neutral-foreground: 222 39% 20%;
   }
 
   .dark {
