@@ -38,9 +38,18 @@ const roleLabel: Record<FunctionRole, string> = {
 const userRoleLabel: Record<UserRole, string> = {
   master: 'Master',
   admin: 'Administrador',
-  manager: 'Gerência',
+  manager: 'Gerente',
   tester: 'Testador',
   viewer: 'Visualizador',
+};
+
+// Color-coded badge styles per permission level
+const USER_ROLE_STYLES: Record<UserRole, { badge: string; icon: string }> = {
+  master:  { badge: 'bg-amber-500/10  text-amber-500  border-amber-500/25',  icon: 'text-amber-500'  },
+  admin:   { badge: 'bg-red-500/10    text-red-500    border-red-500/25',    icon: 'text-red-500'    },
+  manager: { badge: 'bg-blue-500/10   text-blue-500   border-blue-500/25',   icon: 'text-blue-500'   },
+  tester:  { badge: 'bg-green-500/10  text-green-500  border-green-500/25',  icon: 'text-green-500'  },
+  viewer:  { badge: 'bg-muted/50      text-muted-foreground border-border/50', icon: 'text-muted-foreground' },
 };
 
 const RoleIcon: Record<FunctionRole, React.ComponentType<any>> = {
@@ -220,21 +229,27 @@ export const UserProfileModal: React.FC<{
             <div className="text-lg font-semibold">{profile?.display_name || 'Usuário'}</div>
           </div>
 
-          {/* Permissão e Cargo (Lado a Lado) */}
+          {/* Permission Badge + Function Roles */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
-            {/* Nível de Permissão (Master, Admin, etc) */}
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-brand/10 text-brand border border-brand/20 uppercase tracking-widest transition-all hover:bg-brand/20">
-              <Shield className="h-3 w-3 fill-brand/20" />
-              ( {userRoleLabel[(profile?.role as UserRole) || 'viewer']} )
-            </span>
-            
-            {/* Cargo de Função (Desenvolvimento, Teste, Suporte, etc) */}
+            {/* System Role (Master, Admin, etc) — color-coded, no parentheses */}
+            {(() => {
+              const r = (profile?.role as UserRole) || 'viewer';
+              const style = USER_ROLE_STYLES[r] || USER_ROLE_STYLES.viewer;
+              return (
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black border uppercase tracking-widest transition-all ${style.badge}`}>
+                  <Shield className={`h-3 w-3 ${style.icon}`} />
+                  {userRoleLabel[r]}
+                </span>
+              );
+            })()}
+
+            {/* Function Roles */}
             {roles.map((r, idx) => {
               const IconC = (r.icon && TagIconMap[r.icon]) ? TagIconMap[r.icon] : Code;
               return (
-                <span key={`f-role-${idx}`} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-brand/10 text-brand border border-brand/20 uppercase tracking-widest transition-all hover:bg-brand/20">
-                  <IconC className="h-3 w-3 fill-brand/20" />
-                  ( {roleLabel[r.role] || r.role} )
+                <span key={`f-role-${idx}`} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-muted/40 text-foreground/70 border border-border/50 uppercase tracking-widest transition-all hover:bg-muted">
+                  <IconC className="h-3 w-3" />
+                  {roleLabel[r.role] || r.role}
                 </span>
               );
             })}
