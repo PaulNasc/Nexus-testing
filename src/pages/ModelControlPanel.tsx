@@ -32,8 +32,6 @@ const ALL_CAPABILITIES: { id: string; label: string }[] = [
   { id: 'test-plan-generation',      label: 'Planos de Teste' },
   { id: 'test-case-generation',      label: 'Casos de Teste' },
   { id: 'test-execution-generation', label: 'Execuções de Teste' },
-  { id: 'bug-detection',             label: 'Detecção de Bugs' },
-  { id: 'code-analysis',             label: 'Análise de Código' },
   { id: 'general-completion',        label: 'Completion Geral' },
 ];
 
@@ -43,8 +41,6 @@ const TASK_LABELS: Record<string, string> = {
   'test-plan-generation':      'Geração de Planos',
   'test-case-generation':      'Geração de Casos',
   'test-execution-generation': 'Geração de Execuções',
-  'bug-detection':             'Detecção de Bugs',
-  'code-analysis':             'Análise de Código',
   'general-completion':        'Completion Geral',
 };
 
@@ -194,13 +190,48 @@ export const ModelControlPanel = () => {
   };
 
   // Busca modelos disponíveis pelo provedor via API
-  const handleFetchModels = async (ctx: string, provider: AIModel['provider'], apiKey: string, baseUrl?: string) => {
+  const handleFetchModels = async (ctx: string, provider: AIModel['provider'], apiKey: string, baseUrl?: string, onlyFree?: boolean) => {
     if (!apiKey.trim() && provider !== 'ollama' && provider !== 'anthropic') return;
     setFetchingModels(p => ({ ...p, [ctx]: true }));
     setFetchModelError(p => ({ ...p, [ctx]: null }));
     try {
-      const models = await ModelControlService.fetchProviderModels(provider, apiKey.trim(), baseUrl);
+      let models = await ModelControlService.fetchProviderModels(provider, apiKey.trim(), baseUrl);
+      
+      // Filtra os modelos se "Apenas Modelos Gratuitos" estiver selecionado e for OpenRouter
+      if (provider === 'openrouter' && onlyFree) {
+        models = models.filter((m: any) => 
+          m.id.endsWith(':free') || 
+          m.name.toLowerCase().includes('free') ||
+          (m.pricing && parseFloat(m.pricing.prompt) === 0 && parseFloat(m.pricing.completion) === 0)
+        );
+      }
+      
       setFetchedModels(p => ({ ...p, [ctx]: models }));
+
+      // Preenche os slugs alternativos automaticamente se "Apenas Modelos Gratuitos" for verdadeiro e houver resultados
+      if (onlyFree && models.length > 0) {
+        const freeSlugs = models.map(m => m.id);
+        if (ctx === 'new') {
+          setNewModelForm(p => ({
+            ...p,
+            settings: { ...(p.settings || {}), adaptiveSlugs: freeSlugs }
+          }));
+        } else {
+          setInlineForms(p => {
+            const existing = p[ctx] || {};
+            return {
+              ...p,
+              [ctx]: {
+                ...existing,
+                settings: {
+                  ...(existing.settings || {}),
+                  adaptiveSlugs: freeSlugs
+                }
+              }
+            };
+          });
+        }
+      }
     } catch (e: any) {
       setFetchModelError(p => ({ ...p, [ctx]: e.message }));
     } finally {
@@ -428,41 +459,66 @@ export const ModelControlPanel = () => {
               )}
             </div>
 
-            {/* OpenRouter: Modo Adaptativo com Fallback de Slugs */}
-            {provider === 'openrouter' && (
-              <div className="border rounded p-3 space-y-2 bg-muted/30">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium flex items-center gap-1">
-                    <RefreshCcw className="h-3 w-3" />
-                    Modo Adaptativo (Fallback de Slugs)
-                  </Label>
-                  <Switch
-                    checked={form.settings?.adaptiveMode === true || (Array.isArray(form.settings?.adaptiveSlugs) && form.settings.adaptiveSlugs.length > 0)}
-                    onCheckedChange={(checked) => patchSettings({ adaptiveMode: checked })}
-                    className="h-4 w-7"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Quando ativado, tenta múltiplos slugs automaticamente se o principal falhar.
-                </p>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Slugs Alternativos (um por linha)</Label>
-                  <Textarea
-                    value={(form.settings?.adaptiveSlugs as string[] || []).join('\n')}
-                    onChange={e => {
-                      const slugs = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
-                      patchSettings({ adaptiveSlugs: slugs.length > 0 ? slugs : undefined });
-                    }}
-                    placeholder="google/gemma-2-9b-it:free&#10;meta-llama/llama-3.1-70b-instruct:free&#10;mistralai/mistral-7b-instruct:free"
-                    className="text-xs font-mono min-h-[80px]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Slugs personalizados para tentar quando o principal falhar. Se deixar vazio, usa fallbacks automáticos.
-                  </p>
-                </div>
+            {/* Configurações de Roteamento Adaptativo e Filtro Gratuito */}
+            <div className="border rounded p-3 space-y-3 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.settings?.adaptiveMode === true || (Array.isArray(form.settings?.adaptiveSlugs) && form.settings.adaptiveSlugs.length > 0)}
+                  onCheckedChange={(checked) => patchSettings({ adaptiveMode: checked })}
+                  className="flex-shrink-0"
+                  id={`route-slugs-toggle-${modelId}`}
+                />
+                <Label htmlFor={`route-slugs-toggle-${modelId}`} className="text-xs font-medium flex items-center gap-1 cursor-pointer select-none">
+                  <RefreshCcw className="h-3.5 w-3.5 text-brand" />
+                  Rotear entre Slugs (Modo Adaptativo)
+                </Label>
               </div>
-            )}
+              <p className="text-xs text-muted-foreground pl-14">
+                Tenta múltiplos slugs automaticamente se o principal falhar.
+              </p>
+
+              <div className="flex items-center gap-2 border-t pt-2 mt-2">
+                <Switch
+                  checked={form.settings?.onlyFreeModels === true}
+                  onCheckedChange={(checked) => {
+                    patchSettings({ onlyFreeModels: checked });
+                    if (checked) {
+                      const apiKey = form.apiKey || getCachedKeySync(provider, modelId) || getCachedKeySync(provider, '') || '';
+                      handleFetchModels(modelId, provider, apiKey, (form.settings?.baseUrl as string) || '', true);
+                    }
+                  }}
+                  className="flex-shrink-0"
+                  id={`free-models-toggle-${modelId}`}
+                />
+                <Label htmlFor={`free-models-toggle-${modelId}`} className="text-xs font-medium flex items-center gap-1 cursor-pointer select-none">
+                  <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
+                  Apenas Modelos Gratuitos (Custo Zero)
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground pl-14">
+                Filtra para usar apenas slugs gratuitos (ex: `:free` no OpenRouter).
+              </p>
+
+              <div className="space-y-1 border-t pt-2 mt-2">
+                <Label className="text-xs">Slugs Alternativos (um por linha)</Label>
+                <Textarea
+                  value={(form.settings?.adaptiveSlugs as string[] || []).join('\n')}
+                  onChange={e => {
+                    const slugs = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+                    patchSettings({ adaptiveSlugs: slugs.length > 0 ? slugs : undefined });
+                  }}
+                  placeholder={provider === 'openrouter' 
+                    ? "google/gemma-2-9b-it:free\nmeta-llama/llama-3.1-70b-instruct:free\nmistralai/mistral-7b-instruct:free"
+                    : "slug-alternativo-1\nslug-alternativo-2"
+                  }
+                  className="text-xs font-mono min-h-[80px]"
+                  id={`adaptive-slugs-textarea-${modelId}`}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Tentado quando o principal falha. Se vazio no OpenRouter, usa fallbacks gratuitos padrão.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -601,6 +657,67 @@ export const ModelControlPanel = () => {
                   )}
                 </>
               )}
+
+              {/* Configurações de Roteamento Adaptativo e Filtro Gratuito para Novo Modelo */}
+              <div className="border rounded p-3 space-y-3 bg-muted/30 mt-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={form.settings?.adaptiveMode === true || (Array.isArray(form.settings?.adaptiveSlugs) && form.settings.adaptiveSlugs.length > 0)}
+                    onCheckedChange={(checked) => patchSettings({ adaptiveMode: checked })}
+                    className="flex-shrink-0"
+                    id="new-route-slugs-toggle"
+                  />
+                  <Label htmlFor="new-route-slugs-toggle" className="text-xs font-medium flex items-center gap-1 cursor-pointer select-none">
+                    <RefreshCcw className="h-3.5 w-3.5 text-brand" />
+                    Rotear entre Slugs (Modo Adaptativo)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground pl-14">
+                  Tenta múltiplos slugs automaticamente se o principal falhar.
+                </p>
+
+                <div className="flex items-center gap-2 border-t pt-2 mt-2">
+                  <Switch
+                    checked={form.settings?.onlyFreeModels === true}
+                    onCheckedChange={(checked) => {
+                      patchSettings({ onlyFreeModels: checked });
+                      if (checked) {
+                        const apiKey = form.apiKey || '';
+                        handleFetchModels('new', provider, apiKey, (form.settings?.baseUrl as string) || '', true);
+                      }
+                    }}
+                    className="flex-shrink-0"
+                    id="new-free-models-toggle"
+                  />
+                  <Label htmlFor="new-free-models-toggle" className="text-xs font-medium flex items-center gap-1 cursor-pointer select-none">
+                    <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
+                    Apenas Modelos Gratuitos (Custo Zero)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground pl-14">
+                  Filtra para usar apenas slugs gratuitos (ex: `:free` no OpenRouter).
+                </p>
+
+                <div className="space-y-1 border-t pt-2 mt-2">
+                  <Label className="text-xs">Slugs Alternativos (um por linha)</Label>
+                  <Textarea
+                    value={(form.settings?.adaptiveSlugs as string[] || []).join('\n')}
+                    onChange={e => {
+                      const slugs = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+                      patchSettings({ adaptiveSlugs: slugs.length > 0 ? slugs : undefined });
+                    }}
+                    placeholder={provider === 'openrouter' 
+                      ? "google/gemma-2-9b-it:free\nmeta-llama/llama-3.1-70b-instruct:free\nmistralai/mistral-7b-instruct:free"
+                      : "slug-alternativo-1\nslug-alternativo-2"
+                    }
+                    className="text-xs font-mono min-h-[80px]"
+                    id="new-adaptive-slugs-textarea"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Tentado quando o principal falha. Se vazio no OpenRouter, usa fallbacks gratuitos padrão.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

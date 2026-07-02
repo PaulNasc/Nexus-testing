@@ -241,7 +241,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       return;
     }
     setTags((prev) => [...prev, { label, icon: newTagIcon || undefined, color: newTagColor }]);
-    try { logActivity('tag_added', `label=${label}`); } catch {}
+    try { logActivity('tag_added', `label=${label}`); } catch { /* ignore */ }
     setNewTag('');
     setNewTagIcon('');
     setNewTagColor('#10B981');
@@ -250,7 +250,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const removeTag = (idx: number) => {
     const t = tags[idx];
     setTags((prev) => prev.filter((_, i) => i !== idx));
-    try { logActivity('tag_removed', `label=${(t as any)?.label || ''}`); } catch {}
+    try { logActivity('tag_removed', `label=${(t as any)?.label || ''}`); } catch { /* ignore */ }
   };
 
   const toggleRequestedRole = (val: 'desenvolvimento' | 'suporte' | 'gerencia' | 'supervisao' | 'visualizador') => {
@@ -273,7 +273,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       setHasRoleRequest(true);
       setRequestRolesOpen(false);
       toast({ title: 'Solicitação enviada', description: 'Sua solicitação de cargo foi enviada ao Master.' });
-      try { logActivity('role_request_submitted', `roles=${requestedRoles.join(',')}`, user.id); } catch {}
+      try { logActivity('role_request_submitted', `roles=${requestedRoles.join(',')}`, user.id); } catch { /* ignore */ }
     } catch (e: any) {
       toast({ title: 'Erro', description: e?.message || 'Não foi possível enviar a solicitação.', variant: 'destructive' });
     }
@@ -304,16 +304,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       if (profErr) throw profErr;
 
       if (SINGLE_TENANT) {
-        try { await supabase.auth.updateUser({ data: { full_name: displayName, avatar_url: avatarUrl } } as any); } catch {}
+        try { await supabase.auth.updateUser({ data: { full_name: displayName, avatar_url: avatarUrl } } as any); } catch { /* ignore */ }
         toast({ title: 'Perfil atualizado', description: 'Dados salvos com sucesso.' });
         invalidateUserAvatarCache(user.id);
-        try { logActivity('profile_saved', 'single_tenant'); } catch {}
+        try { logActivity('profile_saved', 'single_tenant'); } catch { /* ignore */ }
         return;
       }
 
       toast({ title: 'Perfil atualizado', description: 'Dados do seu perfil foram salvos.' });
       invalidateUserAvatarCache(user.id);
-      try { logActivity('profile_saved', 'multi_tenant'); } catch {}
+      try { logActivity('profile_saved', 'multi_tenant'); } catch { /* ignore */ }
     } catch (e: any) {
       console.error(e);
       toast({ title: 'Erro ao salvar', description: e?.message || 'Tente novamente.', variant: 'destructive' });
@@ -352,7 +352,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       if (profErr) throw profErr;
       toast({ title: 'Avatar atualizado', description: 'Sua foto foi enviada e salva.' });
       invalidateUserAvatarCache(user.id);
-      try { logActivity('avatar_updated'); } catch {}
+      try { logActivity('avatar_updated'); } catch { /* ignore */ }
     } catch (err: any) {
       console.error(err);
       // Tratamento amigável quando bucket não existir

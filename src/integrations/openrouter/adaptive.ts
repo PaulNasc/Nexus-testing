@@ -121,12 +121,13 @@ export async function openRouterGenerateTextAdaptive(
     maxRetries?: number;
     onSlugAttempt?: (slug: string, attempt: number, total: number) => void;
     onFallback?: (failedSlug: string, newSlug: string) => void;
+    onlyFreeModels?: boolean; // Restringir apenas a modelos gratuitos
   }
 ): Promise<{ content: string; slugUsed: string }> {
   if (!apiKey) throw new Error('OpenRouter: API key não configurada');
 
   // Monta lista de slugs para tentar
-  const slugs: string[] = [primarySlug];
+  let slugs: string[] = [primarySlug];
 
   // Adiciona slugs personalizados se fornecidos
   if (options?.customSlugs?.length) {
@@ -136,6 +137,50 @@ export async function openRouterGenerateTextAdaptive(
   // Adiciona slugs gerados automaticamente
   const autoFallbacks = generateFallbackSlugs(primarySlug);
   slugs.push(...autoFallbacks.filter(s => !slugs.includes(s)));
+
+  // Se apenas modelos gratuitos forem permitidos, filtra e mapeia
+  if (options?.onlyFreeModels) {
+    const freeSlugs: string[] = [];
+    const getFreeSlug = (slug: string): string | null => {
+      if (slug.endsWith(':free')) return slug;
+      
+      const freeSuffixes = [
+        'google/gemma-2-9b-it',
+        'meta-llama/llama-3.1-70b-instruct',
+        'mistralai/mistral-7b-instruct',
+        'meta-llama/llama-3-8b-instruct',
+        'qwen/qwen-2.5-7b-instruct',
+        'meta-llama/llama-3.2-3b-instruct',
+        'meta-llama/llama-3.1-8b-instruct',
+        'qwen/qwen-2-7b-instruct',
+        'microsoft/phi-3-medium-128k-instruct'
+      ];
+      
+      if (freeSuffixes.includes(slug)) {
+        return `${slug}:free`;
+      }
+      if (slug.startsWith('meta-llama/') || slug.startsWith('google/') || slug.startsWith('mistralai/') || slug.startsWith('qwen/')) {
+        return `${slug}:free`;
+      }
+      return null;
+    };
+
+    for (const s of slugs) {
+      const freeS = getFreeSlug(s);
+      if (freeS && !freeSlugs.includes(freeS)) {
+        freeSlugs.push(freeS);
+      }
+    }
+
+    if (freeSlugs.length === 0) {
+      freeSlugs.push(
+        'google/gemma-2-9b-it:free',
+        'meta-llama/llama-3.1-70b-instruct:free',
+        'mistralai/mistral-7b-instruct:free'
+      );
+    }
+    slugs = freeSlugs;
+  }
 
   const maxRetries = options?.maxRetries ?? 3;
   const temperature = options?.temperature ?? 0.7;
@@ -165,7 +210,7 @@ export async function openRouterGenerateTextAdaptive(
       if (!res.ok) {
         const errText = await res.text();
         let parsedError: OpenRouterError = {};
-        try { parsedError = JSON.parse(errText); } catch {}
+        try { parsedError = JSON.parse(errText); } catch { /* ignore */ }
 
         // Se for erro de modelo não disponível, tenta próximo slug
         if (isModelUnavailableError(parsedError) || res.status === 404 || res.status === 429) {

@@ -20,6 +20,8 @@ import { useProject } from '@/contexts/ProjectContext';
 import { UserMultiSelectField } from '@/components/forms/UserMultiSelectField';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronUp, Image as ImageIcon, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface AIGeneratorFormProps {
   onSuccess?: (data: any) => void;
@@ -46,12 +48,32 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
     planId: '',
     caseId: '',
     runId: '',
-    assignedTo: '',
+    // Auto-assign creator as responsible
+    assignedTo: user?.id || '',
     selectedModel: 'auto',
-    interestedUsers: [] as string[]
+    interestedUsers: [] as string[],
+    planStatus: 'draft'
   });
   const [file, setFile] = useState<File | null>(null);
   const [images, setImages] = useState<{ name: string; dataUrl: string }[]>([]);
+  const [isEvo, setIsEvo] = useState(true);
+  const [isHybex, setIsHybex] = useState(false);
+
+  const cleanTitle = (t: string): string => {
+    if (!t) return '';
+    return t
+      // Remove slide references like [Slide 21], [Slides 4, 5], [slide 12], [Slide 4, Slide 5], etc.
+      .replace(/\[\s*slide[s]?\s*\d+.*?\]/gi, '')
+      // Remove slide references like Slide 21:, Slide 21 -, slide 12, etc. (when not in brackets) at the start
+      .replace(/^slide[s]?\s*\d+.*?\b[-–—:]?\s*/i, '')
+      // Remove prefix words like Plano de Teste, Caso de Teste, etc.
+      .replace(/^(Plano de Teste[s]?|Caso[s]? de Teste[s]?|Execução|Execuções|Caso|Plano|Test Plan[s]?|Test Case[s]?|Test Execution[s]?)\s*[-–—:]\s*/i, '')
+      .replace(/^(Plano de Teste[s]?|Caso[s]? de Teste[s]?|Execução|Execuções|Caso|Plano|Test Plan[s]?|Test Case[s]?|Test Execution[s]?)\s+/i, '')
+      // Remove quotes from start and end
+      .replace(/^["'“”‘’]+/g, '')
+      .replace(/["'“”‘’]+$/g, '')
+      .trim();
+  };
 
   useEffect(() => {
     if (user) {
@@ -249,41 +271,70 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
         const payload = (typeof result === 'object' && result !== null) ? (result as any) : {};
 
         if (formData.type === 'plan') {
-          const MONTHS_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
           const formatPlanTitle = (): string => {
-            const src = [formData.requirements, formData.description, formData.context].join(' ');
-            // Padrão: Sprint DD/MM/YYYY, Sprint MM/YYYY, Sprint N — Jun/2025, mês por extenso
-            const byMonthName = src.match(/sprint[^\w]*(\d{1,2})[^\w\/]*(?:de\s+)?([A-Za-zÀ-ú]+)\/?(\d{4})?/i);
-            if (byMonthName) {
-              const monthName = byMonthName[2].charAt(0).toUpperCase() + byMonthName[2].slice(1).toLowerCase();
-              const year = byMonthName[3] || new Date().getFullYear().toString();
-              return `Plano de Testes - Sprint ${monthName}/${year}`;
+            const MONTH_NAMES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+            const monthMap: Record<string, string> = {
+              jan: '01', janeiro: '01',
+              fev: '02', fevereiro: '02',
+              mar: '03', marco: '03', março: '03',
+              abr: '04', abril: '04',
+              mai: '05', maio: '05',
+              jun: '06', junho: '06',
+              jul: '07', julho: '07',
+              ago: '08', agosto: '08',
+              set: '09', setembro: '09',
+              out: '10', outubro: '10',
+              nov: '11', novembro: '11',
+              dez: '12', dezembro: '12'
+            };
+
+            const filename = file?.name || '';
+            const src = [
+              formData.requirements,
+              formData.description,
+              formData.context
+            ].join(' ');
+
+            // Match day followed by separator (including dots now)/space/de followed by month name/number, and optional year
+            const dateRegex = /(\d{1,2})(?:[/_.-]|\s+(?:de\s+)?)(jan(?:eiro)?|fev(?:ereiro)?|mar(?:ço)?|abr(?:il)?|mai(?:o)?|jun(?:ho)?|jul(?:ho)?|ago(?:sto)?|set(?:embro)?|out(?:ubro)?|nov(?:embro)?|dez(?:embro)?|\d{1,2})(?:(?:[/_.-]|\s+)(\d{2,4}))?/i;
+            // Prioritize matching from filename first!
+            const match = filename.match(dateRegex) || src.match(dateRegex);
+
+            const typeWord = isHybex ? 'Hybex' : 'Evo';
+
+            if (match) {
+              const dd = match[1].padStart(2, '0');
+              const mmRaw = match[2].toLowerCase();
+              let mm = '';
+              if (monthMap[mmRaw]) {
+                mm = monthMap[mmRaw];
+              } else {
+                mm = mmRaw.padStart(2, '0');
+              }
+              let yyyy = match[3] || new Date().getFullYear().toString();
+              if (yyyy.length === 2) yyyy = '20' + yyyy;
+              const title = `Sprint ${typeWord} ${dd}/${mm} ${yyyy}`;
+              return title.replace(/^["'“”‘’]+/g, '').replace(/["'“”‘’]+$/g, '').trim();
             }
-            const bySlash = src.match(/sprint[^\d]*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{4}))?/i);
-            if (bySlash) {
-              const mm = bySlash[2].padStart(2, '0');
-              const year = bySlash[3] || new Date().getFullYear().toString();
-              const monthName = MONTHS_PT[parseInt(mm, 10) - 1] || mm;
-              return `Plano de Testes - Sprint ${monthName}/${year}`;
-            }
-            const byDate = src.match(/(\d{1,2})[\/\-](\d{4})/);
-            if (byDate) {
-              const mm = byDate[1].padStart(2, '0');
-              const year = byDate[2];
-              const monthName = MONTHS_PT[parseInt(mm, 10) - 1] || mm;
-              return `Plano de Testes - Sprint ${monthName}/${year}`;
-            }
-            if (payload?.title) return payload.title as string;
+
+            // Fallback: usar data atual
             const now = new Date();
-            return `Plano de Testes - Sprint ${MONTHS_PT[now.getMonth()]}/${now.getFullYear()}`;
+            const dd = String(now.getDate()).padStart(2, '0');
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const yyyy = now.getFullYear();
+            const title = `Sprint ${typeWord} ${dd}/${mm} ${yyyy}`;
+            return title.replace(/^["'“”‘’]+/g, '').replace(/["'“”‘’]+$/g, '').trim();
           };
           const newPlan = await createTestPlan({
             ...payload,
             title: formatPlanTitle(),
             user_id: user.id,
             project_id: currentProject.id,
+            assigned_to: formData.assignedTo || user.id || null,
+            status: formData.planStatus || 'draft',
             interested_users: formData.interestedUsers,
-            generated_by_ai: true
+            generated_by_ai: true,
+            images: images
           });
           results.push({ ...newPlan, type: 'plan' });
         } else if (formData.type === 'case') {
@@ -294,8 +345,84 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
               ? (payload as any).cases[0]
               : payload;
 
+          const extractSlideNumbers = (text: string): number[] => {
+            const matches = text.match(/slide\s*(\d+)/gi);
+            if (!matches) return [];
+            const numbers: number[] = [];
+            matches.forEach(m => {
+              const num = parseInt(m.replace(/slide\s*/i, ''), 10);
+              if (!isNaN(num) && !numbers.includes(num)) {
+                numbers.push(num);
+              }
+            });
+            return numbers;
+          };
+
+          const caseTitle = (source as any)?.title || '';
+          const caseDesc = (source as any)?.description || '';
+          const referencedSlides = [
+            ...extractSlideNumbers(caseTitle),
+            ...extractSlideNumbers(caseDesc)
+          ];
+
+          let caseImages: any[] = [];
+          if (images && images.length > 0) {
+            caseImages = images.filter((img: any) => {
+              if (!img.slides || !Array.isArray(img.slides)) return false;
+              return img.slides.some((sNum: number) => referencedSlides.includes(sNum));
+            });
+          }
+
+          if (caseImages.length === 0 && formData.planId) {
+            const selectedPlan = plans.find(p => p.id === formData.planId);
+            const planImages = (selectedPlan as any)?.images || [];
+            caseImages = planImages.filter((img: any) => {
+              if (!img.slides || !Array.isArray(img.slides)) return false;
+              return img.slides.some((sNum: number) => referencedSlides.includes(sNum));
+            });
+          }
+
+          const rawCaseTitle = (source as any)?.title || '';
+          let finalCaseTitle = cleanTitle(rawCaseTitle);
+          if (formData.planId) {
+            const selectedPlan = plans.find(p => p.id === formData.planId);
+            if (selectedPlan) {
+              const MONTH_NAMES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+              const planTitle = selectedPlan.title || '';
+              let sprintLabel = '';
+              
+              if (planTitle.toLowerCase().startsWith('sprint')) {
+                sprintLabel = planTitle;
+              } else {
+                const titleMatch = planTitle.match(/sprint[_-]?(\d{1,2})[_-]?(\d{1,2})(?:[_-]?(\d{4}))?/i);
+                if (titleMatch) {
+                  const dd = titleMatch[1].padStart(2, '0');
+                  const mm = titleMatch[2].padStart(2, '0');
+                  const yyyy = titleMatch[3] || new Date().getFullYear().toString();
+                  const monthName = MONTH_NAMES_PT[parseInt(mm, 10) - 1] || mm;
+                  sprintLabel = `Sprint_${dd}_${monthName}/${yyyy}`;
+                } else {
+                  const schedule = selectedPlan.schedule || selectedPlan.description || '';
+                  const dates = Array.from(schedule.matchAll(/(\d{1,2})[/](\d{1,2})(?:[/](\d{4}))?/g));
+                  if (dates.length > 0) {
+                    const dd = (dates[0][1] as string).padStart(2, '0');
+                    const mm = (dates[0][2] as string).padStart(2, '0');
+                    const yyyy = (dates[0][3] as string | undefined) || new Date().getFullYear().toString();
+                    const monthName = MONTH_NAMES_PT[parseInt(mm, 10) - 1] || mm;
+                    sprintLabel = `Sprint_${dd}_${monthName}/${yyyy}`;
+                  }
+                }
+              }
+              
+              if (sprintLabel) {
+                const cleanedSprintLabel = sprintLabel.replace(/^["'“”‘’]+/g, '').replace(/["'“”‘’]+$/g, '').trim();
+                finalCaseTitle = `${cleanedSprintLabel} - ${finalCaseTitle}`;
+              }
+            }
+          }
+
           const newCase = await createTestCase({
-            title: (source as any)?.title,
+            title: finalCaseTitle,
             description: (source as any)?.description,
             preconditions: (source as any)?.preconditions,
             expected_result: (source as any)?.expected_result,
@@ -307,7 +434,8 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
             project_id: currentProject.id,
             assigned_to: formData.assignedTo || null,
             interested_users: formData.interestedUsers,
-            generated_by_ai: true
+            generated_by_ai: true,
+            images: caseImages
           } as any);
           const stakeholders = [...(formData.interestedUsers || [])];
           if (formData.assignedTo && formData.assignedTo !== 'none') stakeholders.push(formData.assignedTo);
@@ -375,10 +503,17 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
     setLoading(true);
     setLastError(null);
 
-    toast({
+    // Toast de progresso persistente com o spinner animado (Loader2)
+    const activeToast = toast({
       title: "Geração iniciada",
-      description: "A IA está processando sua solicitação em segundo plano."
-    });
+      description: (
+        <div className="flex items-center gap-2 mt-1">
+          <Loader2 className="h-4 w-4 animate-spin text-brand" />
+          <span>A IA está processando sua solicitação em segundo plano...</span>
+        </div>
+      ),
+      duration: 600000, // 10 minutos (infinito prático)
+    } as any);
 
     // Notify parent to close the form/modal and redirect
     onSuccess?.(null);
@@ -386,20 +521,33 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
     // Process in background
     generateWithAI()
       .then((result) => {
-        toast({
+        activeToast.update({
+          id: activeToast.id,
           title: "Sucesso",
-          description: `${formData.type === 'plan' ? 'Plano' : formData.type === 'case' ? 'Caso' : 'Execução'} de teste gerado e salvo com IA!`
-        });
+          description: `${formData.type === 'plan' ? 'Plano' : formData.type === 'case' ? 'Caso' : 'Execução'} de teste gerado e salvo com IA!`,
+          duration: 5000,
+        } as any);
+
+        // Dispara eventos customizados para atualizar as listagens
+        if (formData.type === 'plan') {
+          window.dispatchEvent(new CustomEvent('nexus:plans-changed'));
+        } else if (formData.type === 'case') {
+          window.dispatchEvent(new CustomEvent('nexus:cases-changed'));
+        } else if (formData.type === 'execution') {
+          window.dispatchEvent(new CustomEvent('nexus:executions-changed'));
+        }
       })
       .catch((error: any) => {
         console.error('Erro ao gerar com IA:', error);
         const message: string = error?.message || 'Erro ao gerar conteúdo com IA. Verifique a chave da API e o schema de saída.';
         setLastError(message);
-        toast({
+        activeToast.update({
+          id: activeToast.id,
           title: "Erro na geração",
-          description: message,
-          variant: "destructive"
-        });
+          description: `Falha ao gerar conteúdo: ${message.slice(0, 100)}`,
+          variant: "destructive",
+          duration: 7000,
+        } as any);
       })
       .finally(() => {
         setLoading(false);
@@ -451,7 +599,21 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
         </div>
 
         <div className="flex flex-col items-end gap-1">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Documento de Referência</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Documento de Referência</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-muted-foreground hover:text-foreground transition-colors cursor-help">
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[250px] p-2 text-xs">
+                  Imagens anexadas sumirão depois de 1 mês sendo necessário consultar os docs enviados por e-mail das apresentações.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <label className={cn(
             "flex items-center gap-2 cursor-pointer text-xs transition-all duration-200 border rounded-lg px-3 py-1.5",
             file 
@@ -703,6 +865,54 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
                   placeholder="Notificar interessados..."
                 />
               </div>
+
+              {formData.type === 'plan' && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-border/10">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-semibold flex items-center gap-1.5">
+                      <FileText className="h-3 w-3" /> Status do Plano
+                    </Label>
+                    <Select value={formData.planStatus} onValueChange={(v) => handleChange('planStatus', v)}>
+                      <SelectTrigger className="h-9 text-xs bg-background">
+                        <SelectValue placeholder="Rascunho" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft" className="text-xs">Rascunho</SelectItem>
+                        <SelectItem value="active" className="text-xs">Ativo</SelectItem>
+                        <SelectItem value="review" className="text-xs">Em Revisão</SelectItem>
+                        <SelectItem value="completed" className="text-xs">Concluído</SelectItem>
+                        <SelectItem value="archived" className="text-xs">Arquivado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="evo-checkbox"
+                      checked={isEvo}
+                      onCheckedChange={(checked) => {
+                        setIsEvo(!!checked);
+                        if (checked) setIsHybex(false);
+                      }}
+                    />
+                    <Label htmlFor="evo-checkbox" className="text-xs cursor-pointer font-medium text-foreground/80">
+                      Usar padrão Evo (Sprint Evo)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="hybex-checkbox"
+                      checked={isHybex}
+                      onCheckedChange={(checked) => {
+                        setIsHybex(!!checked);
+                        if (checked) setIsEvo(false);
+                      }}
+                    />
+                    <Label htmlFor="hybex-checkbox" className="text-xs cursor-pointer font-medium text-foreground/80">
+                      Usar padrão Hybex (Sprint Hybex)
+                    </Label>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t border-border/20">

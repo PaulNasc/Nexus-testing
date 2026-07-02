@@ -140,11 +140,15 @@ export const TestCases = () => {
     localStorage.setItem('testCases_viewMode', viewMode);
   }, [viewMode]);
 
-  // Listener para broadcast de troca de projeto (padronizado)
+  // Listener para broadcast de troca de projeto ou alteração nos casos (padronizado)
   useEffect(() => {
     const handler = () => loadCases();
     window.addEventListener('krg:project-changed', handler as EventListener);
-    return () => window.removeEventListener('krg:project-changed', handler as EventListener);
+    window.addEventListener('nexus:cases-changed', handler as EventListener);
+    return () => {
+      window.removeEventListener('krg:project-changed', handler as EventListener);
+      window.removeEventListener('nexus:cases-changed', handler as EventListener);
+    };
   }, []);
 
   // Sincronizar modal de detalhes com a URL (?id=...&modal=case:view)

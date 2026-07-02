@@ -26,7 +26,7 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
         cache.set(userId, r);
         return r;
       }
-    } catch {}
+    } catch { /* ignore */ }
     try {
       const { data: a } = await supabase.auth.getUser();
       if (a?.user?.id === userId) {
@@ -37,7 +37,7 @@ async function fetchProfileData(userId: string): Promise<ProfileData> {
         cache.set(userId, r);
         return r;
       }
-    } catch {}
+    } catch { /* ignore */ }
     const empty: ProfileData = {};
     cache.set(userId, empty);
     return empty;

@@ -152,6 +152,7 @@ function toast({ ...props }: Toast) {
   dispatch({
     type: "ADD_TOAST",
     toast: {
+      duration: props.duration === undefined ? 5000 : props.duration,
       ...props,
       id,
       open: true,

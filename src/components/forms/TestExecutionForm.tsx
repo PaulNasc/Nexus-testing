@@ -16,6 +16,7 @@ import { ProjectSelectField } from '@/components/forms/ProjectSelectField';
 import { StandardButton } from '@/components/StandardButton';
 import { useProjectUsers } from '@/hooks/useProjectUsers';
 import { UserMultiSelectField } from '@/components/forms/UserMultiSelectField';
+import { ImageAttachmentZone } from '@/components/ImageAttachmentZone';
 
 interface TestExecutionFormProps {
   onSuccess?: (execution: TestExecution) => void;
@@ -46,16 +47,19 @@ export const TestExecutionForm = ({ onSuccess, onCancel, caseId, planId, executi
     notes: string;
     executed_by: string;
     interested_users: string[];
+    images: Array<{ name: string; dataUrl: string; slides?: number[] }>;
   }>({
     case_id: caseId || '',
     plan_id: planId || '',
     run_id: '',
-    assigned_to: '',
+    // On create: auto-assign to current user; on edit: useEffect below will override
+    assigned_to: user?.id || '',
     status: 'not_tested',
     actual_result: '',
     notes: '',
     executed_by: user?.email || '',
-    interested_users: [] as string[]
+    interested_users: [] as string[],
+    images: []
   });
 
   const isEdit = !!execution;
@@ -121,7 +125,8 @@ export const TestExecutionForm = ({ onSuccess, onCancel, caseId, planId, executi
         actual_result: execution.actual_result || '',
         notes: execution.notes || '',
         executed_by: execution.executed_by || user?.email || '',
-        interested_users: (execution as any).interested_users || []
+        interested_users: (execution as any).interested_users || [],
+        images: (execution as any).images || []
       });
       // Try to set selected case once cases are available
       const caseData = cases.find(c => c.id === execution.case_id);
@@ -195,7 +200,8 @@ export const TestExecutionForm = ({ onSuccess, onCancel, caseId, planId, executi
           executed_by: formData.executed_by,
           ...(formData.run_id !== ((execution as any).run_id || '') ? { run_id: formData.run_id || null } : {}),
           ...(formData.assigned_to !== ((execution as any).assigned_to || '') ? { assigned_to: formData.assigned_to || null } : {}),
-          interested_users: formData.interested_users
+          interested_users: formData.interested_users,
+          images: formData.images
         } as any);
         await handleStakeholderNotifications(updated.id, true);
         toast({
@@ -411,10 +417,16 @@ export const TestExecutionForm = ({ onSuccess, onCancel, caseId, planId, executi
         />
       </div>
 
+      <ImageAttachmentZone 
+        images={formData.images} 
+        onChange={(imgs) => handleChange('images', imgs)}
+        showWarning={false}
+      />
+
       {/* Footer */}
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
         {onCancel && (
-          <StandardButton type="button" variant="outline" onClick={() => { try { localStorage.removeItem(storageKey); } catch {} onCancel?.(); }}>
+          <StandardButton type="button" variant="outline" onClick={() => { try { localStorage.removeItem(storageKey); } catch { /* ignore */ } onCancel?.(); }}>
             Cancelar
           </StandardButton>
         )}

@@ -114,7 +114,7 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     setProjects([]);
     setCurrentProjectState(null);
     // Persistir 'all' para manter seletor estável
-    try { localStorage.setItem(CURRENT_PROJECT_KEY, 'all'); } catch {}
+    try { localStorage.setItem(CURRENT_PROJECT_KEY, 'all'); } catch { /* ignore */ }
     broadcastProjectChange(null);
   } finally {
     setLoading(false);
@@ -151,9 +151,9 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
         if (d.type === 'project:changed') {
           const p = d.project as Project | null | undefined;
           setCurrentProjectState(p ?? null);
-          try { localStorage.setItem(CURRENT_PROJECT_KEY, p?.id ?? 'all'); } catch {}
+          try { localStorage.setItem(CURRENT_PROJECT_KEY, p?.id ?? 'all'); } catch { /* ignore */ }
           // invalidar queries ativas
-          try { queryClient.invalidateQueries({ predicate: () => true, refetchType: 'active' }); } catch {}
+          try { queryClient.invalidateQueries({ predicate: () => true, refetchType: 'active' }); } catch { /* ignore */ }
         }
       };
       window.addEventListener('message', onMessage);

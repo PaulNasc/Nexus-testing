@@ -415,7 +415,7 @@ export const createTestPlan = async (plan: Omit<TestPlan, 'id' | 'created_at' | 
       undefined,
       { entity: 'plan', id: data.id }
     );
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -451,7 +451,7 @@ export const updateTestPlan = async (id: string, updates: Partial<TestPlan>): Pr
       undefined,
       { entity: 'plan', id: data.id }
     );
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -470,7 +470,7 @@ export const deleteTestPlan = async (id: string) => {
   if (error) {
     throw new Error(`Erro ao excluir plano de teste: ${error.message}`);
   }
-  try { await logActivity(`Plano excluído ${labelPT(row)}`, `Plano de Teste excluído — Título: ${row?.title || ''}`, undefined, { entity: 'plan', id }); } catch {}
+  try { await logActivity(`Plano excluído ${labelPT(row)}`, `Plano de Teste excluído — Título: ${row?.title || ''}`, undefined, { entity: 'plan', id }); } catch { /* ignore */ }
 };
 
 // Contadores de vínculos de um plano
@@ -698,7 +698,7 @@ export const createTestCase = async (testCase: Omit<TestCase, 'id' | 'created_at
   // Log: Caso criado
   try {
     await logActivity(`Caso criado ${labelCT(data)}`, `Caso de Teste criado — Título: ${data.title || ''}`, undefined, { entity: 'case', id: data.id });
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -747,7 +747,7 @@ export const updateTestCase = async (id: string, updates: Partial<TestCase>): Pr
       title: 'título', description: 'descrição', priority: 'prioridade', type: 'tipo', steps: 'passos'
     } as any)[k] || k).join(', ');
     await logActivity(`Caso atualizado ${labelCT(data)}`, `Caso de Teste atualizado — Campos: ${fields}`, undefined, { entity: 'case', id: data.id });
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -769,7 +769,7 @@ export const deleteTestCase = async (id: string) => {
   if (error) {
     throw new Error(`Erro ao excluir caso de teste: ${error.message}`);
   }
-  try { await logActivity(`Caso excluído ${labelCT(row)}`, `Caso de Teste excluído — Título: ${row?.title || ''}`, undefined, { entity: 'case', id }); } catch {}
+  try { await logActivity(`Caso excluído ${labelCT(row)}`, `Caso de Teste excluído — Título: ${row?.title || ''}`, undefined, { entity: 'case', id }); } catch { /* ignore */ }
 };
 
 // Funções para Execuções de Teste
@@ -862,7 +862,7 @@ export const createTestExecution = async (execution: Omit<TestExecution, 'id' | 
   try {
     const context = `Execução de Teste criada — Status: ${ptStatus(data.status)}${data.actual_result ? `; Resultado: ${truncate(data.actual_result, 80)}` : ''}`;
     await logActivity(`Execução criada ${labelEXE(data)}`, context, undefined, { entity: 'execution', id: data.id });
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -901,7 +901,7 @@ export const updateTestExecution = async (id: string, updates: Partial<TestExecu
         const snippet = cleanUpdates.actual_result ? `; Resultado: ${truncate(String(cleanUpdates.actual_result), 80)}` : '';
         const context = `Execução de Teste atualizada — Campos: ${fields}${extras}${snippet}`;
         await logActivity(`Execução atualizada ${labelEXE(row)}`, context, undefined, { entity: 'execution', id: row.id });
-      } catch {}
+      } catch { /* ignore */ }
       return {
         ...row,
         status: row.status as 'passed' | 'failed' | 'blocked' | 'not_tested',
@@ -919,7 +919,7 @@ export const updateTestExecution = async (id: string, updates: Partial<TestExecu
     const snippet = cleanUpdates.actual_result ? `; Resultado: ${truncate(String(cleanUpdates.actual_result), 80)}` : '';
     const context = `Execução de Teste atualizada — Campos: ${fields}${extras}${snippet}`;
     await logActivity(`Execução atualizada ${labelEXE({ id })}`, context, undefined, { entity: 'execution', id });
-  } catch {}
+  } catch { /* ignore */ }
   return {
     id: id,
     ...(cleanUpdates as any),
@@ -940,7 +940,7 @@ export const deleteTestExecution = async (id: string) => {
   }
   try {
     await logActivity(`Execução excluída ${labelEXE(row)}`, `Execução removida — Status: ${row?.status ? ptStatus(row?.status) : ''}`, undefined, { entity: 'execution', id });
-  } catch {}
+  } catch { /* ignore */ }
 };
 
 // =====================
@@ -986,7 +986,7 @@ export const createRequirement = async (req: Omit<Requirement, 'id' | 'created_a
   // Log: Requisito criado
   try {
     await logActivity(`Requisito criado ${labelREQ(data)}`, `Requisito criado — Título: ${data.title || ''}`, undefined, { entity: 'requirement', id: data.id });
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -1015,7 +1015,7 @@ export const updateRequirement = async (id: string, updates: Partial<Requirement
   try {
     const fields = Object.keys(clean).map(k => ({ title: 'título', description: 'descrição', priority: 'prioridade', status: 'status' } as any)[k] || k).join(', ');
     await logActivity(`Requisito atualizado ${labelREQ(data)}`, `Requisito atualizado — Campos: ${fields}`, undefined, { entity: 'requirement', id: data.id });
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -1035,7 +1035,7 @@ export const deleteRequirement = async (id: string) => {
   if (error) {
     throw new Error(`Erro ao excluir requisito: ${error.message}`);
   }
-  try { await logActivity(`Requisito excluído ${labelREQ(row)}`, `Requisito excluído — Título: ${row?.title || ''}`, undefined, { entity: 'requirement', id }); } catch {}
+  try { await logActivity(`Requisito excluído ${labelREQ(row)}`, `Requisito excluído — Título: ${row?.title || ''}`, undefined, { entity: 'requirement', id }); } catch { /* ignore */ }
 };
 
 // Vínculos requisito ↔ caso
@@ -1248,7 +1248,7 @@ export const createDefect = async (defect: Omit<Defect, 'id' | 'created_at' | 'u
     const st = (data.status as string) || '';
     const sv = (data.severity as string) || '';
     await logActivity(`Defeito criado ${labelDF(data)}`, `Defeito criado — Status: ${st}; Severidade: ${sv}${data.title ? `; Título: ${data.title}` : ''}`);
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -1277,7 +1277,7 @@ export const updateDefect = async (id: string, updates: Partial<Defect>): Promis
     const fields = Object.keys(clean).map(k => ({ title: 'título', description: 'descrição', status: 'status', severity: 'severidade' } as any)[k] || k).join(', ');
     const extra = (clean as any).status ? ` — Novo status: ${(clean as any).status}` : '';
     await logActivity(`Defeito atualizado ${labelDEF(data)}`, `Defeito atualizado — Campos: ${fields}${extra}`);
-  } catch {}
+  } catch { /* ignore */ }
 
   return {
     ...data,
@@ -1297,5 +1297,5 @@ export const deleteDefect = async (id: string) => {
   if (error) {
     throw new Error(`Erro ao excluir defeito: ${error.message}`);
   }
-  try { await logActivity(`Defeito excluído ${labelDEF(row)}`, `Defeito excluído — Título: ${row?.title || ''}`); } catch {}
+  try { await logActivity(`Defeito excluído ${labelDEF(row)}`, `Defeito excluído — Título: ${row?.title || ''}`); } catch { /* ignore */ }
 };

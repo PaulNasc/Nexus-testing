@@ -6,7 +6,7 @@ import {
   FileText, TestTube, PlayCircle, Bug, Plus, Sparkles,
   ClipboardCheck, Link2, BarChart3, Download, Loader2,
   TrendingUp, CheckCircle, XCircle, MinusCircle, Clock,
-  ChevronRight,
+  ChevronRight, Rocket, FolderPlus
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -25,6 +25,11 @@ import { UnifiedTestCreation } from '@/components/UnifiedTestCreation';
 import { useNavigate } from 'react-router-dom';
 import { useProject } from '@/contexts/ProjectContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { createProject, generateSlug, checkSlugExists } from '@/services/projectService';
+import { toast } from '@/components/ui/use-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -105,12 +110,46 @@ export const Dashboard = () => {
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
   const { settings } = useDashboardSettings();
-  const { currentProject, projects } = useProject();
+  const { currentProject, projects, setCurrentProject, refreshProjects } = useProject();
   const navigate = useNavigate();
 
   const [welcomeName, setWelcomeName] = useState('Usuário');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+
+  // ── Onboarding / Welcome States ──
+  const [showWelcomeCreate, setShowWelcomeCreate] = useState(false);
+  const [welcomeCreating, setWelcomeCreating] = useState(false);
+  const [welcomeForm, setWelcomeForm] = useState({ name: '', description: '', color: '#3b82f6' });
+
+  const createNewWelcomeProject = async () => {
+    if (!user || !welcomeForm.name.trim()) return;
+    try {
+      setWelcomeCreating(true);
+      let slug = generateSlug(welcomeForm.name);
+      let counter = 1;
+      while (await checkSlugExists(slug)) {
+        slug = `${generateSlug(welcomeForm.name)}-${counter++}`;
+      }
+      const proj = await createProject({
+        name: welcomeForm.name.trim(),
+        slug,
+        description: welcomeForm.description.trim() || undefined,
+        color: welcomeForm.color,
+        created_by: user.id,
+      });
+      await refreshProjects();
+      setCurrentProject(proj);
+      toast({ title: 'Projeto criado', description: `"${proj.name}" criado com sucesso.` });
+      setShowWelcomeCreate(false);
+      setWelcomeForm({ name: '', description: '', color: '#3b82f6' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Erro', description: 'Não foi possível criar o projeto.', variant: 'destructive' });
+    } finally {
+      setWelcomeCreating(false);
+    }
+  };
 
   // ── Stats ──
   const [overview, setOverview] = useState({
@@ -232,6 +271,127 @@ export const Dashboard = () => {
       <div className="flex items-center justify-center h-64 gap-3 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
         <span className="text-sm">Carregando...</span>
+      </div>
+    );
+  }
+
+  if (projects.length === 0) {
+    const canCreateProject = hasPermission('can_manage_projects') || user?.role === 'master' || user?.role === 'admin';
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 py-12 animate-fade-in">
+        <div className="max-w-md w-full bg-card/45 border border-border/85 rounded-xl p-8 backdrop-blur-md shadow-2xl relative overflow-hidden bg-gradient-to-br from-brand/5 via-transparent to-info/5 flex flex-col items-center text-center space-y-6 transition-all duration-300 hover:border-border/100">
+          {/* Glowing blob background */}
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-info/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Rocket icon indicator */}
+          <div className="h-16 w-16 bg-brand/15 text-brand rounded-2xl flex items-center justify-center shadow-lg border border-brand/20 animate-pulse">
+            <Rocket className="h-8 w-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold tracking-tight">Bem-vindo, {welcomeName}! 👋</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Você acabou de entrar no Nexus Testing. Para começar a gerenciar seus testes, requisitos e defeitos, você precisa de um projeto ativo.
+            </p>
+          </div>
+
+          <div className="border border-border/50 bg-muted/20 rounded-lg p-4 w-full text-center">
+            <p className="text-sm font-medium text-brand-foreground/95 flex items-center justify-center gap-1.5">
+              <span>🚀</span> Crie seu primeiro projeto para começar
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Defina um nome, uma cor de identificação e uma descrição para o seu espaço de trabalho.
+            </p>
+          </div>
+
+          {canCreateProject ? (
+            <Dialog open={showWelcomeCreate} onOpenChange={setShowWelcomeCreate}>
+              <DialogTrigger asChild>
+                <Button className="w-full accent-gradient-bg text-brand-foreground border-0 hover:opacity-95 shadow-md flex items-center justify-center gap-2 py-5 font-semibold text-sm rounded-lg transition-transform active:scale-[0.98]">
+                  <FolderPlus className="h-4 w-4" /> Crie seu Primeiro Projeto
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Criar Novo Projeto</DialogTitle>
+                  <DialogDescription>
+                    Preencha os dados abaixo para iniciar seu primeiro espaço de trabalho no Nexus.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="wpname">Nome do Projeto</Label>
+                    <Input
+                      id="wpname"
+                      placeholder="Ex: App Web - Vendas"
+                      value={welcomeForm.name}
+                      onChange={(e) => setWelcomeForm((s) => ({ ...s, name: e.target.value }))}
+                      maxLength={100}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="wpdesc">Descrição (opcional)</Label>
+                    <Textarea
+                      id="wpdesc"
+                      placeholder="Breve descrição sobre o que este projeto irá testar..."
+                      rows={3}
+                      value={welcomeForm.description}
+                      onChange={(e) => setWelcomeForm((s) => ({ ...s, description: e.target.value }))}
+                      maxLength={500}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="wpcolor">Cor de Destaque</Label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        id="wpcolor"
+                        type="color"
+                        className="w-12 h-10 rounded border cursor-pointer bg-transparent"
+                        value={welcomeForm.color}
+                        onChange={(e) => setWelcomeForm((s) => ({ ...s, color: e.target.value }))}
+                      />
+                      <span className="text-sm font-mono text-muted-foreground">{welcomeForm.color}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => setShowWelcomeCreate(false)}
+                      disabled={welcomeCreating}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={createNewWelcomeProject}
+                      disabled={welcomeCreating || !welcomeForm.name.trim()}
+                      className="bg-brand text-brand-foreground hover:bg-brand/90"
+                    >
+                      {welcomeCreating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Criando...
+                        </>
+                      ) : (
+                        'Criar Projeto'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <div className="text-xs text-amber-400 border border-amber-500/20 bg-amber-500/5 rounded-lg p-3 text-left w-full flex items-start gap-2">
+              <span className="mt-0.5">⚠️</span>
+              <span>
+                <strong>Acesso limitado:</strong> Você ainda não possui nenhum projeto associado. Solicite a um administrador do sistema que crie um projeto e vincule seu usuário.
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     );
   }

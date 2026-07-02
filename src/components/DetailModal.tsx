@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Calendar, Sparkles, Loader2, ClipboardList, Link2, Bug as BugIcon, ChevronDown } from 'lucide-react';
+import { Edit, Trash2, Calendar, Sparkles, Loader2, ClipboardList, Link2, Bug as BugIcon, ChevronDown, ChevronLeft, ChevronRight, Download, Info, Image as ImageIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TestPlan, TestCase, TestExecution, Requirement, Defect } from '@/types';
 import { ExportDropdown } from './ExportDropdown';
@@ -11,8 +11,9 @@ import { UserProfileModal } from './UserProfileModal';
 import { TeamAvatars } from './TeamAvatars';
 import { toast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api';
-import { formatLocalDateTime } from '@/lib/utils';
+import { formatLocalDateTime, cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const userRoleLabel: Record<string, string> = {
   master: 'Master',
@@ -83,6 +84,30 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
   const { currentProject } = useProject();
   const isProjectInactive = !!currentProject && currentProject.status !== 'active';
 
+  const [carouselOpen, setCarouselOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [hasMoreScroll, setHasMoreScroll] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+    setHasMoreScroll(el.scrollHeight > el.clientHeight + 24 && !atBottom);
+    setHasScrolled(el.scrollTop > 60);
+  }, []);
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   // Reset confirmDelete when modal is closed or item changes
   useEffect(() => {
     if (!isOpen) {
@@ -93,8 +118,25 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       setLinkedReqs([]);
       setLinkedCases([]);
       setInterestedProfiles([]);
+      setCarouselOpen(false);
+      setCurrentImageIndex(0);
+      setZoomOpen(false);
+      setHasMoreScroll(false);
+      setHasScrolled(false);
+    } else {
+      // Delay to let content render before checking scroll
+      setTimeout(checkScroll, 150);
     }
-  }, [isOpen]);
+  }, [isOpen, item, checkScroll]);
+
+  // Keep scroll indicator in sync as content changes
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(checkScroll);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [checkScroll]);
 
   // Buscar casos vinculados ao requisito
   useEffect(() => {
@@ -236,10 +278,12 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
   };
 
   // Confirma e dispara a geração com as opções escolhidas
-  const confirmAndGenerate = async () => {
+  const confirmAndGenerate = () => {
     const modelOverride = selectedModelId === 'default' ? undefined : selectedModelId;
     setShowGenerateDialog(false);
-    await handleGenerateCasesForPlan({ additionalContext, modelId: modelOverride });
+    onClose();
+    // Dispara a geração em segundo plano
+    handleGenerateCasesForPlan({ additionalContext, modelId: modelOverride });
   };
 
   const handleDelete = () => {
@@ -276,7 +320,22 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
     switch (type) {
       case 'plan':        return `PT-${padded}`;
       case 'case':        return `CT-${padded}`;
-      case 'execution':   return `EX-${padded}`;
+      case 'execution':   return `EXE-${padded}`;
+      case 'requirement': return `REQ-${padded}`;
+      case 'defect':      return `DEF-${padded}`;
+      default:            return `#${padded}`;
+    }
+  };
+
+  // Short ID badge — no line break (e.g. PT-001, CT-018, EXE-001)
+  const getItemSequenceBadgeLabel = () => {
+    const seq = (item as any).sequence;
+    if (seq == null) return null;
+    const padded = String(seq).padStart(3, '0');
+    switch (type) {
+      case 'plan':        return `PT-${padded}`;
+      case 'case':        return `CT-${padded}`;
+      case 'execution':   return `EXE-${padded}`;
       case 'requirement': return `REQ-${padded}`;
       case 'defect':      return `DEF-${padded}`;
       default:            return `#${padded}`;
@@ -286,7 +345,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
   const getItemTitle = () => {
     if (type === 'execution') {
       const seq = 'sequence' in item && (item as any).sequence ? (item as any).sequence : null;
-      const label = seq ? `EX-${String(seq).padStart(3, '0')}` : `#${item.id.slice(0, 8)}`;
+      const label = seq ? `EXE-${String(seq).padStart(3, '0')}` : `#${item.id.slice(0, 8)}`;
       const notes = (item as TestExecution).notes;
       return notes ? `${label} - ${notes.slice(0, 60)}${notes.length > 60 ? '…' : ''}` : label;
     }
@@ -339,11 +398,11 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                   const mt = (authData.user.user_metadata as any)?.tags;
                   if (Array.isArray(mt)) setAuthorTags(mt);
                 }
-              } catch {}
+              } catch { /* ignore */ }
             }
             return;
           }
-        } catch {}
+        } catch { /* ignore */ }
         // Fallback: auth.getUser() (SINGLE_TENANT or when profile row is missing)
         const { data: authData } = await apiClient.auth.getUser();
         const me = authData?.user;
@@ -404,6 +463,68 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
     const text = (raw ?? '').toString().trim();
     if (!text) return null;
 
+    // Normalize slide ranges in plain text (e.g. "slides 15-18" => "[Slide 15, 16, 17, 18]")
+    const normalizeSlideReferences = (txt: string): string => {
+      // Expand ranges like "slides 15-18" => "[Slide 15, 16, 17, 18]"
+      const result = txt.replace(
+        /\bslides?\s+(\d+)\s*[-\u2013\u2014a-z]\s*(\d+)\b/gi,
+        (_m, start, end) => {
+          const s = parseInt(start, 10);
+          const e = parseInt(end, 10);
+          if (isNaN(s) || isNaN(e) || e < s || e - s > 50) return _m;
+          const nums = Array.from({ length: e - s + 1 }, (_, i) => s + i);
+          return `[Slide ${nums.join(', ')}]`;
+        }
+      );
+      // Collapse adjacent duplicate slide tags (same numbers already bracketed)
+      return result;
+    };
+
+    const renderTextWithSlideBadges = (rawTxt: string) => {
+      const txt = normalizeSlideReferences(rawTxt);
+      // Normalize: [Slide 4, Slide 5] → [Slide 4, 5] so single regex handles it
+      const normalized = txt
+        // Merge [Slide X, Slide Y, Slide Z] into [Slide X, Y, Z]
+        .replace(/\[\s*(slide\s*\d+)(?:\s*,\s*slide\s*(\d+))+\s*\]/gi, (m) => {
+          const nums = Array.from(m.matchAll(/\d+/g)).map(x => x[0]);
+          return `[Slide ${nums.join(', ')}]`;
+        })
+        // Merge consecutive bracket slide refs that appear side-by-side
+        .replace(/\[\s*slides?\s*([\d,\s]+)\]\s*,?\s*\[\s*slides?\s*([\d,\s]+)\]/gi,
+          (_m, a, b) => `[Slide ${a.trim()}, ${b.trim()}]`
+        );
+      const slideRegex = /\[\s*slide[s]?\s*[\d,\s]+\]/gi;
+      const parts = normalized.split(slideRegex);
+      const matches = normalized.match(slideRegex);
+
+      if (!matches) return <span>{txt}</span>;
+
+      return (
+        <span>
+          {parts.map((part, index) => {
+            const match = matches[index];
+            return (
+              <span key={index}>
+                {part}
+                {match && (
+                  <span
+                    className="inline-flex items-center gap-0.5 ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold select-none align-middle border"
+                    style={{
+                      backgroundColor: currentProject?.color ? `${currentProject.color}15` : 'var(--brand-opacity-10)',
+                      color: currentProject?.color || 'var(--brand)',
+                      borderColor: currentProject?.color ? `${currentProject.color}33` : 'var(--brand-opacity-20)',
+                    }}
+                  >
+                    {match.replace(/\[|\]/g, '').trim()}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </span>
+      );
+    };
+
     const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
     // Caso especial: bloco consolidado por caso
@@ -412,9 +533,9 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       const items = rest.map(l => l.replace(/^#\d+\s*/, '').trim()).filter(Boolean);
       return (
         <div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 text-left">{label}</p>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 text-left">{renderTextWithSlideBadges(label)}</p>
           <ol className="list-decimal list-outside ml-5 text-gray-600 dark:text-gray-400 text-sm text-left">
-            {items.map((i, idx) => (<li key={idx}>{i}</li>))}
+            {items.map((i, idx) => (<li key={idx}>{renderTextWithSlideBadges(i)}</li>))}
           </ol>
         </div>
       );
@@ -425,7 +546,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       const isVeryShort = text.length < 80 && !/\r?\n/.test(text);
       if (isVeryShort) {
         return (
-          <p className="text-gray-600 dark:text-gray-400 text-sm text-center">{text}</p>
+          <p className="text-gray-600 dark:text-gray-400 text-sm text-center">{renderTextWithSlideBadges(text)}</p>
         );
       }
     }
@@ -438,7 +559,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       });
       return (
         <ul className="list-disc list-outside ml-5 text-gray-600 dark:text-gray-400 text-sm text-left">
-          {items.map((i, idx) => (<li key={idx}>{i}</li>))}
+          {items.map((i, idx) => (<li key={idx}>{renderTextWithSlideBadges(i)}</li>))}
         </ul>
       );
     }
@@ -453,9 +574,9 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       if (items.length) {
         return (
           <div>
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 text-left">{label}:</p>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-2 text-left">{renderTextWithSlideBadges(label)}:</p>
             <ul className="list-none ml-0 text-gray-600 dark:text-gray-400 text-sm text-left">
-              {items.map((i, idx) => (<li key={idx}>º {i}</li>))}
+              {items.map((i, idx) => (<li key={idx}>º {renderTextWithSlideBadges(i)}</li>))}
             </ul>
           </div>
         );
@@ -463,7 +584,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
     }
 
     return (
-      <p className="text-gray-600 dark:text-gray-400 text-sm whitespace-pre-wrap text-left">{text}</p>
+      <p className="text-gray-600 dark:text-gray-400 text-sm whitespace-pre-wrap text-left">{renderTextWithSlideBadges(text)}</p>
     );
   };
 
@@ -529,14 +650,25 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
           if (parsed) return parsed;
         }
       }
-      return raw;
     }
-    return {};
   }
 
   const handleGenerateCasesForPlan = async (opts?: { additionalContext?: string; modelId?: string }) => {
     if (!item || type !== 'plan') return;
     const plan = item as TestPlan;
+
+    // Toast de progresso persistente com o spinner animado
+    const activeToast = toast({
+      title: "Geração de casos iniciada",
+      description: (
+        <div className="flex items-center gap-2 mt-1">
+          <Loader2 className="h-4 w-4 animate-spin text-brand" />
+          <span>A IA está analisando o plano e gerando os casos de teste em segundo plano...</span>
+        </div>
+      ),
+      duration: 600000, // 10 minutos (infinito prático)
+    } as any);
+
     setGenerating(true);
     try {
       // Monta conteúdo do documento a partir do plano atual
@@ -559,13 +691,13 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
         if (!s || s.length > 100 || s.length < 3) return false;
         if (/\*\*/.test(s)) return false;
         if (/\s/.test(s)) return false;
-        return /^[\w\-\/\.\u00C0-\u017F]+$/.test(s);
+        return /^[\w./\u00C0-\u017F-]+$/.test(s);
       };
       const lines = sourceRaw.split('\n').map(l => l.trim()).filter(Boolean);
       const branchLines: string[] = [];
       for (const line of lines) {
         // Ignora headers de grupo tipo "Backend:"
-        if (/^([A-Za-zÀ-ú\s\-]+):$/.test(line)) continue;
+        if (/^([A-Za-zÀ-ú\s-]+):$/.test(line)) continue;
         // Remove marcadores e divide por delimitadores
         const cleaned = line.replace(/^[*•º]\s*/, '').trim();
         const tokens = cleaned.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean);
@@ -579,6 +711,9 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       const extractSprintLabel = (): { fallback: string; label: string } => {
         // 1) Titulo do plano: "Sprint 16/06" ou "sprint_16_06"
         const planTitle = plan.title || '';
+        if (planTitle.toLowerCase().startsWith('sprint')) {
+          return { fallback: planTitle.replace(/\s+/g, '_'), label: planTitle };
+        }
         const titleMatch = planTitle.match(/sprint[_-]?(\d{1,2})[_-]?(\d{1,2})(?:[_-]?(\d{4}))?/i);
         if (titleMatch) {
           const dd = titleMatch[1].padStart(2, '0');
@@ -589,7 +724,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
         }
         // 2) Cronograma: primeira data DD/MM ou DD/MM/YYYY
         const schedule = plan.schedule || plan.description || '';
-        const dates = Array.from(schedule.matchAll(/(\d{1,2})[\/](\d{1,2})(?:[\/](\d{4}))?/g));
+        const dates = Array.from(schedule.matchAll(/(\d{1,2})[/](\d{1,2})(?:[/](\d{4}))?/g));
         if (dates.length > 0) {
           const dd = (dates[0][1] as string).padStart(2, '0');
           const mm = (dates[0][2] as string).padStart(2, '0');
@@ -615,10 +750,18 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
 
       const prompt = `
       Analise o seguinte documento e crie casos de teste específicos para cada funcionalidade/branch identificada.${branchInstruction}
-
+ 
       DOCUMENTO:
       ${documentContent}
-
+ 
+      REGRAS DE DETECÇÃO DE MÓDULOS DO SISTEMA (CRÍTICO):
+      O sistema é composto por múltiplos módulos, tais como: GO, Clock, Flow, Printer, Keep, e outros que possam ser mencionados no documento.
+      - Se uma funcionalidade/alteração diz respeito a múltiplos módulos (ou se refere a "todos os módulos"), você DEVE gerar UM CASO DE TESTE INDIVIDUAL E SEPARADO PARA CADA UM dos módulos correspondentes (ex: crie um caso para [GO], outro para [Clock], outro para [Flow], outro para [Printer] e outro para [Keep]).
+      - O título de cada caso gerado DEVE obrigatoriamente iniciar com o prefixo do módulo correspondente entre colchetes. Ex: "[GO] Validar barra de navegação lock", "[Clock] Validar barra de navegação lock", etc.
+      - NUNCA agrupe múltiplos módulos em um único caso de teste sob a escrita "[Todos os Módulos]". Crie casos separados para garantir que a funcionalidade seja validada em cada módulo.
+      - O campo "module" do JSON de cada caso deve conter exatamente o nome do módulo específico (ex: "GO", "Clock", "Flow", "Printer", "Keep").
+      - Se a funcionalidade NÃO especifica módulos distintos, NÃO inclua prefixo de módulo no título.
+ 
       INSTRUÇÕES IMPORTANTES:
       - Analise o documento e identifique TODAS as funcionalidades, cenários e variações de teste necessárias
       - Uma mesma branch pode ter múltiplos casos se houver diferentes funcionalidades ou cenários de teste
@@ -626,18 +769,21 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       - O prefixo de sprint será adicionado automaticamente ao título — não o inclua
       - Cada caso deve ser independente e testável
       - Inclua passos de teste detalhados
-
+      - Se o plano de teste ou escopo referenciar slides específicos para esta funcionalidade (ex: [Slide 15], slides 15-18), as citações de slides na descrição do caso devem ser feitas EXCLUSIVAMENTE através de tags no formato "[Slide X, Y, Z]". Consolide TODAS as referências de slides do caso em uma única tag, posicionada em qualquer local ao decorrer do texto da descrição (não precisa estar no início ou em local fixo). Nunca mencione slides fora do formato de tag, e nunca coloque slides no campo "title".
+      - NUNCA use o texto "(Ver mais)" ou "(ver mais)" em nenhuma das respostas. O conteúdo descritivo deve ser limitado ao resumo direto e completo.
+ 
       Retorne um JSON válido com esta estrutura EXATA:
       {
         "cases": [
           {
-            "title": "título específico do caso",
-            "description": "descrição direta e objetiva",
+            "title": "título específico do caso (sem slides, com [MODULO] se aplicável)",
+            "description": "descrição direta com referências de slides no formato [Slide X, Y, Z] se aplicável",
             "preconditions": "pré-condições necessárias",
             "expected_result": "resultado esperado final",
             "priority": "medium",
             "type": "functional",
-            "branch": "<nome exato da branch deste caso — copie da lista acima, sem # ou prefixo>",
+            "module": "nome do módulo se aplicável, senão string vazia",
+            "branch": "nome exato da branch deste caso — copie da lista acima, sem simbolo # ou prefixo",
             "steps": [
               {
                 "action": "ação a ser executada",
@@ -647,8 +793,8 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
           }
         ]
       }
-
-      IMPORTANTE: Gere quantos casos forem necessários baseado na análise do documento, mas seja específico e direto.
+ 
+      IMPORTANTE: Gere quantos casos forem necessários baseado na análise do documento. Quando uma funcionalidade afeta múltiplos módulos, você DEVE gerar um caso de teste separado para cada módulo envolvido, incluindo o prefixo correspondente no título. Seja específico e direto.
     `;
 
       // Seleção de modelo (mesma lógica de fallback do formulário de IA) com override opcional
@@ -678,6 +824,22 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
       console.log('[AI Cases] branches do plano:', branchLines);
       console.log('[AI Cases] casos recebidos da IA:', (casesRaw as any[]).map((c: any) => ({ title: c?.title, branch: c?.branch || c?.branches })));
 
+      const cleanTitle = (t: string): string => {
+        if (!t) return '';
+        return t
+          // Remove slide references like [Slide 21], [Slides 4, 5], [slide 12], [Slide 4, Slide 5], etc.
+          .replace(/\[\s*slide[s]?\s*\d+.*?\]/gi, '')
+          // Remove slide references like Slide 21:, Slide 21 -, slide 12, etc. (when not in brackets) at the start
+          .replace(/^slide[s]?\s*\d+.*?\b[-–—:]?\s*/i, '')
+          // Remove prefix words like Plano de Teste, Caso de Teste, etc.
+          .replace(/^(Plano de Teste[s]?|Caso[s]? de Teste[s]?|Execução|Execuções|Caso|Plano|Test Plan[s]?|Test Case[s]?|Test Execution[s]?)\s*[-–—:]\s*/i, '')
+          .replace(/^(Plano de Teste[s]?|Caso[s]? de Teste[s]?|Execução|Execuções|Caso|Plano|Test Plan[s]?|Test Case[s]?|Test Execution[s]?)\s+/i, '')
+          // Remove quotes from start and end
+          .replace(/^["'“”‘’]+/g, '')
+          .replace(/["'“”‘’]+$/g, '')
+          .trim();
+      };
+
       const casesToInsert = (casesRaw as any[]).map((c: any, idx: number) => {
         const stepsArray = Array.isArray(c?.steps) ? c.steps : (
           typeof c?.steps === 'string'
@@ -690,7 +852,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
         // 3) Round-robin nas branches do plano
         // 4) Fallback sprint_DD_MM do cronograma
         const isValidBranch = (s: string) => !!s && s.length >= 3 && s.length <= 100
-          && !/\*\*/.test(s) && !/\s/.test(s) && /^[\w\-\/\.\u00C0-\u017F]+$/.test(s);
+          && !/\*\*/.test(s) && !/\s/.test(s) && /^[\w./\u00C0-\u017F-]+$/.test(s);
         const iaBranchRaw = (typeof c?.branch === 'string' && c.branch.trim()) || (typeof c?.branches === 'string' && c.branches.trim()) || '';
         const iaBranch = isValidBranch(iaBranchRaw) ? iaBranchRaw : '';
 
@@ -704,7 +866,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
           let bestBranch = '';
           let bestScore = 0;
           for (const br of branchLines) {
-            const brTokens = br.toLowerCase().split(/[_\-\/\.]+/).filter(t => t.length >= 3);
+            const brTokens = br.toLowerCase().split(/[_./-]+/).filter(t => t.length >= 3);
             const score = brTokens.reduce((acc, t) => acc + (titleTokens.has(t) ? 1 : 0), 0);
             if (score > bestScore) { bestScore = score; bestBranch = br; }
           }
@@ -720,9 +882,36 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
         const titleWithoutBranch = caseBranch
           ? rawTitle.replace(new RegExp(caseBranch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '').replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, '').trim()
           : rawTitle;
+
+        const extractSlideNumbers = (text: string): number[] => {
+          const matches = text.match(/slide\s*(\d+)/gi);
+          if (!matches) return [];
+          const numbers: number[] = [];
+          matches.forEach(m => {
+            const num = parseInt(m.replace(/slide\s*/i, ''), 10);
+            if (!isNaN(num) && !numbers.includes(num)) {
+              numbers.push(num);
+            }
+          });
+          return numbers;
+        };
+
+        const referencedSlides = [
+          ...extractSlideNumbers(rawTitle),
+          ...extractSlideNumbers(typeof c?.description === 'string' ? c.description : '')
+        ];
+
+        const cleanedTitle = cleanTitle(titleWithoutBranch || rawTitle);
         const finalTitle = sprintLabel
-          ? `${sprintLabel} — ${titleWithoutBranch || rawTitle}`
-          : titleWithoutBranch || rawTitle;
+          ? `${sprintLabel.replace(/^["'“”‘’]+/g, '').replace(/["'“”‘’]+$/g, '').trim()} - ${cleanedTitle}`
+          : cleanedTitle;
+
+        const planImages = (plan as any).images || [];
+        const caseImages = planImages.filter((img: any) => {
+          if (!img.slides || !Array.isArray(img.slides)) return false;
+          return img.slides.some((sNum: number) => referencedSlides.includes(sNum));
+        });
+
         return {
           plan_id: plan.id,
           title: finalTitle,
@@ -742,6 +931,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
           generated_by_ai: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          images: caseImages,
         };
       });
 
@@ -780,13 +970,26 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
         }));
       }
 
-      toast({
+      activeToast.update({
+        id: activeToast.id,
         title: 'Sucesso',
-        description: `${casesToInsert.length} caso(s) e ${reqCount} requisito(s) criados e vinculados ao plano.`
-      });
+        description: `${casesToInsert.length} caso(s) e ${reqCount} requisito(s) criados e vinculados ao plano.`,
+        duration: 5000,
+      } as any);
+
+      // Dispara eventos customizados para atualizar as listagens
+      window.dispatchEvent(new CustomEvent('nexus:cases-changed'));
+      window.dispatchEvent(new CustomEvent('nexus:plans-changed'));
     } catch (e: unknown) {
+      console.error('Erro ao gerar casos:', e);
       const msg = e instanceof Error ? e.message : String(e);
-      toast({ title: 'Erro', description: `Falha ao gerar casos: ${msg}`, variant: 'destructive' });
+      activeToast.update({
+        id: activeToast.id,
+        title: 'Erro na geração',
+        description: `Falha ao gerar casos de teste. Detalhe: ${msg.slice(0, 100)}`,
+        variant: 'destructive',
+        duration: 7000,
+      } as any);
     } finally {
       setGenerating(false);
     }
@@ -813,91 +1016,101 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
 
   return (<>
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto scrollbar-auto-hide">
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0">
         <DialogTitle className="sr-only">{getTypeLabel()} — {getItemTitle()}</DialogTitle>
 
-        <div className="pr-8 flex flex-col md:flex-row md:items-start justify-between gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xl font-bold text-foreground leading-tight flex items-center gap-3">
-              <span 
-                className="text-brand/80 font-mono text-base bg-brand/10 hover:bg-brand/20 cursor-pointer px-2 py-0.5 rounded border border-brand/20 transition-colors"
-                title="Copiar ID e Título"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(getItemTitle());
-                    toast({ title: 'Copiado', description: getItemTitle() });
-                  } catch {
-                    toast({ title: 'Erro', description: 'Não foi possível copiar', variant: 'destructive' });
-                  }
-                }}
-              >
-                {getItemSequenceLabel() || `#${item.id.slice(0, 8)}`}
-              </span>
-              {type === 'execution' ? ((item as TestExecution).notes || 'Execução sem notas') : (item as any).title}
-            </h2>
-            {type === 'execution' && defectCount > 0 && (
-              <Badge
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 shrink-0 cursor-pointer h-7"
-                title={`${defectCount} defeito(s) aberto(s) vinculado(s) à execução`}
-              >
-                <BugIcon className="h-3.5 w-3.5 mr-1" />
-                {defectCount}
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3 bg-muted/20 p-2 px-3 rounded-xl border border-border/40 backdrop-blur-sm">
-          <div className="flex items-center gap-2 flex-wrap">
-            {('status' in item && item.status) && (
-              <Badge className={
-                type === 'execution' ? executionStatusBadgeClass(item.status as ExecutionStatus)
-                : type === 'requirement' ? requirementStatusBadgeClass(item.status as any)
-                : type === 'defect' ? defectStatusBadgeClass(item.status as any)
-                : planStatusClasses(item.status as string)
-              }>
-                {type === 'execution' ? executionStatusLabel(item.status as ExecutionStatus)
-                : type === 'requirement' ? requirementStatusLabel(item.status as any)
-                : type === 'defect' ? defectStatusLabel(item.status as any)
-                : translateStatus(item.status as string)}
-              </Badge>
-            )}
-            {('priority' in item && (item as any).priority) && (
-              <Badge className={priorityBadgeClass((item as any).priority)} variant="secondary">
-                {priorityLabel((item as any).priority)}
-              </Badge>
-            )}
-          </div>
-
-          {allTeamMembers.length > 0 && (
-            <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest hidden sm:inline">
-                Equipe
-              </span>
-              <TeamAvatars
-                users={allTeamMembers}
-                maxDisplay={2}
-                onUserClick={(uid) => {
-                  if (author?.id === uid) setShowAuthorModal(true);
-                  else if (assignedUser?.id === uid) setShowAssignedModal(true);
-                  else if (executor?.id === uid) setShowExecutorModal(true);
-                  else setShowAssignedModal(true);
-                }}
-              />
+        {/* Cabeçalho Fixo */}
+        <div className="p-6 pb-3 shrink-0 border-b border-border/40 bg-background">
+          <div className="pr-8 flex flex-col md:flex-row md:items-start justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl font-bold text-foreground leading-tight flex items-center gap-3">
+                <span 
+                  className="text-brand/80 font-mono text-base bg-brand/10 hover:bg-brand/20 cursor-pointer px-2 py-0.5 rounded border border-brand/20 transition-colors whitespace-nowrap"
+                  title="Copiar ID e Título"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(getItemTitle());
+                      toast({ title: 'Copiado', description: getItemTitle() });
+                    } catch {
+                      toast({ title: 'Erro', description: 'Não foi possível copiar', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  {getItemSequenceBadgeLabel() || `#${item.id.slice(0, 8)}`}
+                </span>
+                {type === 'execution' ? ((item as TestExecution).notes || 'Execução sem notas') : (item as any).title}
+              </h2>
+              {type === 'execution' && defectCount > 0 && (
+                <Badge
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90 shrink-0 cursor-pointer h-7"
+                  title={`${defectCount} defeito(s) aberto(s) vinculado(s) à execução`}
+                >
+                  <BugIcon className="h-3.5 w-3.5 mr-1" />
+                  {defectCount}
+                </Badge>
+              )}
             </div>
-          )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3 bg-muted/20 p-2 px-3 rounded-xl border border-border/40 backdrop-blur-sm">
+            <div className="flex items-center gap-2 flex-wrap">
+              {('status' in item && item.status) && (
+                <Badge className={
+                  type === 'execution' ? executionStatusBadgeClass(item.status as ExecutionStatus)
+                  : type === 'requirement' ? requirementStatusBadgeClass(item.status as any)
+                  : type === 'defect' ? defectStatusBadgeClass(item.status as any)
+                  : planStatusClasses(item.status as string)
+                }>
+                  {type === 'execution' ? executionStatusLabel(item.status as ExecutionStatus)
+                  : type === 'requirement' ? requirementStatusLabel(item.status as any)
+                  : type === 'defect' ? defectStatusLabel(item.status as any)
+                  : translateStatus(item.status as string)}
+                </Badge>
+              )}
+              {('priority' in item && (item as any).priority) && (
+                <Badge className={priorityBadgeClass((item as any).priority)} variant="secondary">
+                  {priorityLabel((item as any).priority)}
+                </Badge>
+              )}
+            </div>
+
+            {allTeamMembers.length > 0 && (
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest hidden sm:inline">
+                  Equipe
+                </span>
+                <TeamAvatars
+                  users={allTeamMembers}
+                  maxDisplay={2}
+                  onUserClick={(uid) => {
+                    if (author?.id === uid) setShowAuthorModal(true);
+                    else if (assignedUser?.id === uid) setShowAssignedModal(true);
+                    else if (executor?.id === uid) setShowExecutorModal(true);
+                    else setShowAssignedModal(true);
+                  }}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Data de criação/execução */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 mb-2">
-          <Calendar className="h-3.5 w-3.5 shrink-0 text-brand/70" />
-          <span className="opacity-70">{type === 'execution' ? 'Executado em:' : 'Criado em:'}</span>
-          <span className="text-foreground font-medium">{formatDate(getItemDate())}</span>
-        </div>
+        {/* Conteúdo Rolável */}
+        <div className="relative flex-1 flex flex-col border-b border-border/10 min-h-0" style={{maxHeight:'55vh'}}>
+        <div
+          ref={scrollRef}
+          onScroll={checkScroll}
+          className="overflow-y-auto flex-1 p-6 py-4 space-y-4"
+          style={{overflowY:'auto'}}
+        >
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Calendar className="h-3.5 w-3.5 shrink-0 text-brand/70" />
+            <span className="opacity-70">{type === 'execution' ? 'Executado em:' : 'Criado em:'}</span>
+            <span className="text-foreground font-medium">{formatDate(getItemDate())}</span>
+          </div>
 
-        <hr className="border-border/60" />
+          <hr className="border-border/60" />
 
-        <div className="py-3 space-y-4">
+          <div className="py-1 space-y-4">
 
           {/* Descrição */}
           {desc && (
@@ -923,7 +1136,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
               if (/\*\*/.test(s)) return false; // markdown bold
               if (/\s/.test(s)) return false;   // sem espacos — sempre token unico
               // snake_case, kebab-case, slash, pontos, acentos
-              return /^[\w\-\/\.\u00C0-\u017F]+$/.test(s);
+              return /^[\w./\u00C0-\u017F-]+$/.test(s);
             };
 
             const parseBranchGroups = (raw: string): { group: string; items: string[] }[] => {
@@ -931,7 +1144,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
               const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
               const groups: { group: string; items: string[] }[] = [];
               let current: { group: string; items: string[] } | null = null;
-              const groupHeaderRex = /^([A-Za-zÀ-ú\s\-]+):$/;
+              const groupHeaderRex = /^([A-Za-zÀ-ú\s-]+):$/;
               for (const line of lines) {
                 if (groupHeaderRex.test(line) && !line.startsWith('*') && !line.startsWith('-')) {
                   current = { group: line.replace(/:$/, '').trim(), items: [] };
@@ -971,11 +1184,19 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
             return (
               <>
                 {gridItems.length > 0 && (
-                  <div className="md:columns-2 md:gap-5 space-y-5 md:space-y-0">
-                    {gridItems.map((field) => (
-                      <div key={field.label} className="break-inside-avoid md:mb-5">
-                        <h3 className="text-sm font-semibold text-foreground mb-1.5">{field.label}</h3>
-                        {renderListOrParagraph(field.content)}
+                  <div className="space-y-4 bg-muted/10 border border-border/40 p-4 rounded-xl">
+                    {gridItems.map((field, idx) => (
+                      <div key={field.label} className={cn(
+                        "pb-3.5",
+                        idx < gridItems.length - 1 ? "border-b border-border/20" : ""
+                      )}>
+                        <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full inline-block" style={{ backgroundColor: currentProject?.color || 'var(--brand)' }} />
+                          {field.label}
+                        </h3>
+                        <div className="text-sm text-foreground/90 pl-3">
+                          {renderListOrParagraph(field.content)}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -984,7 +1205,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                   <Collapsible defaultOpen={false} className="rounded-lg border border-border/50 bg-muted/20 p-3.5 group mt-4">
                     <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity" aria-label={`Branches de Entrega — ${totalBranches} branch${totalBranches !== 1 ? 'es' : ''}`}>
                       <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-brand inline-block" />
+                        <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: currentProject?.color || 'var(--brand)' }} />
                         Branches de Entrega
                         <span className="ml-2 text-xs font-normal text-muted-foreground">{totalBranches} branch{totalBranches !== 1 ? 'es' : ''}</span>
                       </h3>
@@ -1002,6 +1223,11 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                                 key={bi}
                                 type="button"
                                 aria-label={`Copiar branch ${b}`}
+                                style={{
+                                  backgroundColor: currentProject?.color ? `${currentProject.color}15` : undefined,
+                                  color: currentProject?.color || undefined,
+                                  borderColor: currentProject?.color ? `${currentProject.color}33` : undefined,
+                                }}
                                 className="inline-flex items-center gap-1 rounded-md bg-brand/10 border border-brand/20 hover:bg-brand/20 active:scale-95 transition px-2 py-0.5 text-xs font-mono text-brand cursor-copy"
                                 title={`Copiar ${b}`}
                                 onClick={(e) => {
@@ -1009,7 +1235,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                                   try {
                                     navigator.clipboard.writeText(b);
                                     toast({ title: 'Branch copiada', description: b });
-                                  } catch {}
+                                  } catch { /* ignore error */ }
                                 }}
                               >
                                 <span className="opacity-60">#</span>{b}
@@ -1061,7 +1287,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
               {branchTokens.length > 0 && (
                 <div className="rounded-lg border border-border/50 bg-muted/20 p-3.5">
                   <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-brand inline-block" />
+                    <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: currentProject?.color || 'var(--brand)' }} />
                     Branch
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
@@ -1079,6 +1305,11 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                           }
                         }}
                         title={`Copiar ${b}`}
+                        style={{
+                          backgroundColor: currentProject?.color ? `${currentProject.color}15` : undefined,
+                          color: currentProject?.color || undefined,
+                          borderColor: currentProject?.color ? `${currentProject.color}33` : undefined,
+                        }}
                         className="inline-flex items-center gap-1 rounded-md bg-brand/10 border border-brand/20 hover:bg-brand/20 active:scale-95 transition px-2 py-0.5 text-xs font-mono text-brand cursor-pointer"
                       >
                         <span className="opacity-60">#</span>{b}
@@ -1178,44 +1409,260 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
           )}
 
         </div>
+        </div>
+        {/* Scroll indicator — aparece sutil no canto direito após o usuário rolar */}
+        <div
+          className={`absolute bottom-3 right-4 z-20 pointer-events-none transition-all duration-300 ${
+            hasMoreScroll && hasScrolled ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="pointer-events-auto flex items-center gap-1 px-2.5 py-1 rounded-full bg-background/80 backdrop-blur-sm text-muted-foreground shadow border border-border/40 hover:text-foreground hover:border-border active:scale-95 transition-all cursor-pointer text-[11px] font-medium"
+            title="Ir até o final do conteúdo"
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+            Ir até o final
+          </button>
+        </div>
+        </div>{/* end relative scroll wrapper */}
 
-        <hr className="border-border" />
-
-        <div className="flex items-center justify-between pt-4 gap-3">
-          <div>
-            <ExportDropdown item={item} type={type} />
-          </div>
-          <div className="flex gap-2">
-            {type === 'plan' && ('generated_by_ai' in item && Boolean(item.generated_by_ai)) && (
-              <Button onClick={openGenerateDialog} disabled={generating || isProjectInactive} title={isProjectInactive ? 'Projeto não ativo — geração desabilitada' : undefined}>
-                {generating ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando...</>
-                ) : (
-                  <><Sparkles className="h-4 w-4 mr-1" />Gerar Casos</>
-                )}
-              </Button>
-            )}
-            {onEdit && (
-              <Button variant="outline" onClick={() => onEdit(item)} disabled={isProjectInactive} title={isProjectInactive ? 'Projeto não ativo — edição desabilitada' : undefined}>
-                <Edit className="h-4 w-4 mr-1" />
-                Editar
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant={confirmDelete ? "destructive" : "outline"}
-                onClick={handleDelete}
-                disabled={isProjectInactive}
-                title={isProjectInactive ? 'Projeto não ativo — exclusão desabilitada' : undefined}
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                {confirmDelete ? 'Confirmar Exclusão' : 'Excluir'}
-              </Button>
-            )}
+        {/* Rodapé Fixo */}
+        <div className="p-6 pt-3 shrink-0 border-t border-border bg-background">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ExportDropdown item={item} type={type} />
+              {(() => {
+                const imgCount = (item.images && Array.isArray(item.images)) ? item.images.length : 0;
+                return (
+                  <button
+                    type="button"
+                    disabled={imgCount === 0}
+                    onClick={() => setCarouselOpen(true)}
+                    title={imgCount > 0 ? `Ver ${imgCount} imagem${imgCount !== 1 ? 's' : ''} de referência` : 'Nenhuma imagem disponível'}
+                    className={`relative h-8 w-8 flex items-center justify-center rounded-md border transition-all ${
+                      imgCount > 0
+                        ? 'border-brand/25 bg-brand/5 hover:bg-brand/15 hover:border-brand/50 cursor-pointer'
+                        : 'border-border/40 bg-background/50 opacity-40 cursor-not-allowed'
+                    }`}
+                  >
+                    {/* Gradient icon */}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <defs>
+                        <linearGradient id="img-btn-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor={imgCount > 0 ? '#6366f1' : '#94a3b8'} />
+                          <stop offset="100%" stopColor={imgCount > 0 ? '#ec4899' : '#94a3b8'} />
+                        </linearGradient>
+                      </defs>
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="url(#img-btn-grad)" />
+                      <circle cx="8.5" cy="8.5" r="1.5" stroke="url(#img-btn-grad)" />
+                      <polyline points="21 15 16 10 5 21" stroke="url(#img-btn-grad)" />
+                    </svg>
+                    {/* Badge de contagem */}
+                    {imgCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-0.5 flex items-center justify-center rounded-full text-[9px] font-bold bg-gradient-to-br from-indigo-500 to-pink-500 text-white shadow-sm border border-background leading-none">
+                        {imgCount > 99 ? '99+' : imgCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
+            </div>
+            <div className="flex gap-2">
+              {type === 'plan' && ('generated_by_ai' in item && Boolean(item.generated_by_ai)) && (
+                <Button onClick={openGenerateDialog} disabled={generating || isProjectInactive} title={isProjectInactive ? 'Projeto não ativo — geração desabilitada' : undefined}>
+                  {generating ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando...</>
+                  ) : (
+                    <><Sparkles className="h-4 w-4 mr-1" />Gerar Casos</>
+                  )}
+                </Button>
+              )}
+              {onEdit && (
+                <Button variant="outline" onClick={() => onEdit(item)} disabled={isProjectInactive} title={isProjectInactive ? 'Projeto não ativo — edição desabilitada' : undefined}>
+                  <Edit className="h-4 w-4 mr-1" />
+                  Editar
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant={confirmDelete ? "destructive" : "outline"}
+                  onClick={handleDelete}
+                  disabled={isProjectInactive}
+                  title={isProjectInactive ? 'Projeto não ativo — exclusão desabilitada' : undefined}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  {confirmDelete ? 'Confirmar Exclusão' : 'Excluir'}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </DialogContent>
+          </DialogContent>
     </Dialog>
+
+    {/* Modal de Carrossel de Imagens */}
+    {item.images && item.images.length > 0 && (
+      <Dialog open={carouselOpen} onOpenChange={setCarouselOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-background">
+          <DialogHeader className="p-6 pb-2 border-b border-border/40 shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-base font-bold flex items-center gap-2">
+                <ImageIcon className="h-5 w-5 text-brand" />
+                Imagens de Referência ({item.images.length})
+              </DialogTitle>
+              {/* Tooltip de expiração */}
+              {(type === 'plan' || type === 'case') && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex items-center gap-1 text-[11px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 cursor-help font-medium">
+                        <Info className="h-3 w-3" />
+                        Expira em 30 dias
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs p-2.5">
+                      Imagens anexadas sumirão depois de 1 mês sendo necessário consultar os docs enviados por e-mail das apresentações.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              Visualização de mídias anexadas ao {getTypeLabel().toLowerCase()}.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Conteúdo Central */}
+          <div className="flex-1 flex flex-col items-center justify-center p-6 bg-black/5 dark:bg-black/40 overflow-hidden relative min-h-[400px]">
+            {/* Imagem Atual */}
+            <div className="relative max-w-full max-h-[50vh] flex items-center justify-center cursor-zoom-in group" onClick={() => setZoomOpen(true)}>
+              <img
+                src={item.images[currentImageIndex]?.dataUrl}
+                alt={item.images[currentImageIndex]?.name || `Imagem ${currentImageIndex + 1}`}
+                className="max-w-full max-h-[50vh] object-contain rounded-md shadow-md border border-border/40 transition-transform duration-200 hover:scale-[1.01]"
+              />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-md">
+                <span className="text-xs text-white font-medium bg-black/60 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                  Clique para Expandir
+                </span>
+              </div>
+            </div>
+
+            {/* Controles de Navegação (Prev / Next) */}
+            {item.images.length > 1 && (
+              <>
+                <button
+                  onClick={() => setCurrentImageIndex(prev => (prev === 0 ? item.images!.length - 1 : prev - 1))}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-background/80 hover:bg-background border border-border flex items-center justify-center shadow transition-all hover:scale-105 active:scale-95 text-muted-foreground hover:text-foreground"
+                  title="Anterior"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setCurrentImageIndex(prev => (prev === item.images!.length - 1 ? 0 : prev + 1))}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-background/80 hover:bg-background border border-border flex items-center justify-center shadow transition-all hover:scale-105 active:scale-95 text-muted-foreground hover:text-foreground"
+                  title="Próximo"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Informações da Imagem e Download */}
+          <div className="p-4 bg-muted/20 border-t border-border/40 shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground flex flex-col gap-1 text-center sm:text-left">
+              <span className="font-semibold text-foreground truncate max-w-sm">
+                {item.images[currentImageIndex]?.name || `Imagem ${currentImageIndex + 1}`}
+              </span>
+              {item.images[currentImageIndex]?.slides && item.images[currentImageIndex]?.slides!.length > 0 && (
+                <span className="text-[11px] text-brand font-medium">
+                  Referência: Slide {item.images[currentImageIndex]?.slides?.join(', ')}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = item.images![currentImageIndex].dataUrl;
+                  link.download = item.images![currentImageIndex].name || `imagem_${currentImageIndex + 1}.png`;
+                  link.click();
+                }}
+                className="h-8 text-xs font-semibold gap-1"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Baixar Imagem
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCarouselOpen(false)}
+                className="h-8 text-xs font-semibold"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+
+          {/* Thumbnails list */}
+          {item.images.length > 1 && (
+            <div className="px-6 py-3 border-t border-border/20 shrink-0 bg-muted/5 flex gap-2 overflow-x-auto max-w-full">
+              {item.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentImageIndex(idx)}
+                  className={cn(
+                    "h-12 w-16 relative rounded border overflow-hidden transition-all duration-200 shrink-0",
+                    currentImageIndex === idx ? "border-brand ring-2 ring-brand/20 opacity-100 scale-105" : "border-border/60 opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <img src={img.dataUrl} alt="" className="h-full w-full object-cover" />
+                  {img.slides && img.slides.length > 0 && (
+                    <span className="absolute bottom-0 right-0 bg-brand text-white text-[8px] font-bold px-1 rounded-tl">
+                      S{img.slides[0]}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    )}
+
+    {/* Modal Zoom de Imagem Expandido */}
+    {item.images && item.images.length > 0 && zoomOpen && (
+      <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+          <button 
+            className="absolute right-4 top-4 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors z-50 text-xs font-semibold"
+            onClick={() => setZoomOpen(false)}
+          >
+            Fechar Zoom [x]
+          </button>
+          <div className="w-full h-full flex items-center justify-center p-4">
+            <img
+              src={item.images[currentImageIndex]?.dataUrl}
+              alt={item.images[currentImageIndex]?.name || ""}
+              className="max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
 
     <UserProfileModal
       isOpen={showAuthorModal}

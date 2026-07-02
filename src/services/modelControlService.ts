@@ -68,7 +68,7 @@ const defaultConfig: AIModelConfig = {
       provider: 'gemini',
       description: 'Google Gemini 2.0 Flash — Modelo estável de nova geração, rápido e gratuito com chave de API padrão.',
       version: '2.0-flash',
-      capabilities: ['test-plan-generation', 'test-case-generation', 'test-execution-generation', 'bug-detection', 'general-completion'],
+      capabilities: ['test-plan-generation', 'test-case-generation', 'test-execution-generation', 'general-completion'],
       defaultForTask: 'test-plan-generation',
       apiKey: undefined,
       active: true,
@@ -92,8 +92,8 @@ const defaultConfig: AIModelConfig = {
       provider: 'gemini',
       description: 'Google Gemini 2.5 Pro Preview — Modelo mais capaz do Google, raciocínio avançado (experimental).',
       version: '2.5-pro',
-      capabilities: ['test-plan-generation', 'test-case-generation', 'bug-detection', 'code-analysis', 'general-completion'],
-      defaultForTask: 'code-analysis',
+      capabilities: ['test-plan-generation', 'test-case-generation', 'general-completion'],
+      defaultForTask: null,
       apiKey: undefined,
       active: false,
       settings: { temperature: 0.7, maxOutputTokens: 16384 }
@@ -104,7 +104,7 @@ const defaultConfig: AIModelConfig = {
       provider: 'gemini',
       description: 'Google Gemini 2.0 Flash Thinking — Raciocínio chain-of-thought avançado, para análises complexas.',
       version: '2.0-thinking',
-      capabilities: ['test-plan-generation', 'test-case-generation', 'bug-detection', 'code-analysis', 'general-completion'],
+      capabilities: ['test-plan-generation', 'test-case-generation', 'general-completion'],
       defaultForTask: null,
       apiKey: undefined,
       active: false,
@@ -116,7 +116,7 @@ const defaultConfig: AIModelConfig = {
       provider: 'gemini',
       description: 'Google Gemini 2.0 Flash Experimental — Capacidades multimodais avançadas.',
       version: '2.0-flash-exp',
-      capabilities: ['test-plan-generation', 'test-case-generation', 'bug-detection', 'code-analysis', 'general-completion'],
+      capabilities: ['test-plan-generation', 'test-case-generation', 'general-completion'],
       defaultForTask: null,
       apiKey: undefined,
       active: false,
@@ -165,7 +165,7 @@ const defaultConfig: AIModelConfig = {
       provider: 'groq',
       description: 'Alibaba QwQ 32B via Groq — Modelo de raciocínio avançado, excelente para análise de testes, gratuito',
       version: 'qwq-32b',
-      capabilities: ['test-plan-generation', 'test-case-generation', 'bug-detection', 'code-analysis', 'general-completion'],
+      capabilities: ['test-plan-generation', 'test-case-generation', 'general-completion'],
       defaultForTask: null,
       apiKey: undefined,
       active: false,
@@ -251,10 +251,10 @@ const defaultConfig: AIModelConfig = {
           "title": "<Título do plano em português>",
           "description": "<Descrição clara dos objetivos, 2-3 frases>",
           "objective": "<Objetivo principal do plano, 2-3 frases>",
-          "scope": "<Escopo detalhado: liste cada funcionalidade/entrega como item de lista usando o caractere *>",
+          "scope": "<Escopo detalhado: liste cada funcionalidade/entrega como item de lista usando o caractere *. IMPORTANTE: Caso o documento de referência (ex: apresentação do PowerPoint) possua slides específicos (ex: Slide 1, Slide 2, etc.), você DEVE citar explicitamente todos os slides que motivaram cada funcionalidade/entrega no escopo, obrigatoriamente ao final do item (ex: '* Implementação de Login [Slide 4, Slide 5]'). Certifique-se de listar todos os slides aplicáveis a essa funcionalidade/entrega, inclusive quando uma alteração estiver detalhada em múltiplos slides (ex: se o fluxo está no slide 4 e 5, cite [Slide 4, Slide 5]). Crie itens de escopo completos que englobem todas as alterações descritas em todos os slides pertinentes a essa funcionalidade.>",
           "approach": "<Abordagem/metodologia: liste cada tipo de teste como item de lista usando o caractere *>",
           "criteria": "<Critérios de entrada e saída: liste cada critério como item de lista usando o caractere *>",
-          "schedule": "<Cronograma e marcos principais da sprint em português>",
+          "schedule": "<Cronograma e marcos principais da sprint em português. IMPORTANTE: Não divida o cronograma em lista de dias corridos ou de desenvolvimento (ex: evite usar 'Dia 1', 'Dia 2', 'Dias 3-5', etc.). Em vez disso, forneça um resumo conciso das entregas e marcos principais com base nas datas da sprint.>",
           "risks": "<Riscos potenciais e suas mitigações: liste cada risco como item de lista usando o caractere *>",
           "branches": "<CAMPO CRÍTICO — Liste APENAS nomes de branches de código-fonte REALMENTE presentes no documento (padrões reconhecidos: sprint_xx_yy, feature/xxx, hotfix/xxx, fix/xxx, bugfix/xxx, release/xxx). Formato EXATO:\nFront-end:\n* sprint_xx_nome_branch\n* hotfix/nome-fix\nBack-end:\n* sprint_xx_nome_branch\nSe Front/Back não for indicado, use único grupo 'Geral:'. REGRAS ABSOLUTAS: (1) Cada item DEVE ser um token único sem espaços, em snake_case/kebab-case/slash (ex: sprint_16_06_login). (2) É PROIBIDO colocar frases, descrições, títulos de funcionalidades ou texto em português. Ex PROIBIDO: 'Adição de desconto automático' ou 'Correção de bug'. (3) Se NÃO encontrar NENHUM nome de branch real no documento, retorne string VAZIA ''. Prefira vazio a inventar nomes.>"
         }
@@ -270,6 +270,7 @@ const defaultConfig: AIModelConfig = {
           * "Cerimônias", "Marcos", "Kickoff", "Follow-up"
           * Qualquer entrada que seja apenas descritiva do processo de desenvolvimento (não da funcionalidade entregue).
         - No campo "scope" inclua APENAS funcionalidades/entregas que geram código testável (features, bugfixes, refactors, mudanças de endpoint).
+        - NUNCA inclua o texto "(Ver mais)" ou "(ver mais)" em nenhuma parte das respostas. O conteúdo descritivo deve ser limitado ao resumo direto e completo.
       `,
       description: 'Template padrão para gerar planos de teste detalhados',
       parameters: ['appDescription', 'requirements', 'additionalContext', 'branches'],
@@ -288,23 +289,40 @@ const defaultConfig: AIModelConfig = {
         
         Gere {{numCases}} caso(s) de teste que cubram diferentes aspectos do plano.
         
-        Retorne um objeto JSON com EXATAMENTE esta estrutura:
-        - schemaVersion: DEVE ser exatamente "case.v1"
-        - title: Título do caso de teste em português
-        - description: O que este teste valida em português
-        - preconditions: Pré-condições necessárias em português
-        - steps: Array de passos, cada um com:
-            - order: Número sequencial do passo iniciando em 1
-            - action: Ação a ser executada em português
-            - expected_result: Resultado esperado para o passo em português
-        - expected_result: Resultado esperado geral do caso de teste em português
-        - priority: Uma de: 'low', 'medium', 'high', 'critical'
-        - type: Uma de: 'functional', 'integration', 'performance', 'security', 'usability'
+        REGRAS DE DETECÇÃO DE MÓDULOS DO SISTEMA (CRÍTICO):
+        O sistema é composto por múltiplos módulos, tais como: GO, Clock, Flow, Printer, Keep, e outros que possam ser mencionados.
+        - Se uma funcionalidade/alteração diz respeito a múltiplos módulos (ou se refere a "todos os módulos"), você DEVE gerar UM CASO DE TESTE INDIVIDUAL E SEPARADO PARA CADA UM dos módulos correspondentes (ex: crie um caso para [GO], outro para [Clock], outro para [Flow], outro para [Printer] e outro para [Keep]).
+        - O título de cada caso gerado DEVE obrigatoriamente iniciar com o prefixo do módulo correspondente entre colchetes. Ex: "[GO] Validar barra de navegação lock", "[Clock] Validar barra de navegação lock", etc.
+        - NUNCA agrupe múltiplos módulos em um único caso de teste sob a escrita "[Todos os Módulos]". Crie casos separados para garantir que a funcionalidade seja validada em cada módulo.
+        - O campo "module" do JSON de cada caso deve conter exatamente o nome do módulo específico (ex: "GO", "Clock", "Flow", "Printer", "Keep").
+        - Se a funcionalidade NÃO especifica módulos distintos, NÃO inclua prefixo de módulo no título.
+        
+        Retorne obrigatoriamente um objeto JSON com esta estrutura (retornando múltiplos casos dentro do array se aplicável aos módulos):
+        {
+          "cases": [
+            {
+              "title": "Título específico do caso (sem a escrita 'Caso de Teste', com prefixo [MODULO] se aplicável, e SEM referências de slides)",
+              "description": "O que este teste valida. Se o plano ou escopo referenciar slides específicos para esta funcionalidade (ex: [Slide 15], slides 15-18), as citações de slides na descrição do caso devem ser feitas EXCLUSIVAMENTE através de tags no formato '[Slide X, Y, Z]'. Consolide TODAS as referências de slides do caso em uma única tag, posicionada em qualquer local ao decorrer do texto da descrição (não precisa estar no início ou em local fixo). Nunca mencione slides fora do formato de tag.",
+              "preconditions": "Pré-condições necessárias em português",
+              "steps": [
+                {
+                  "order": 1,
+                  "action": "Ação a ser executada em português",
+                  "expected_result": "Resultado esperado para o passo em português"
+                }
+              ],
+              "expected_result": "Resultado esperado geral do caso de teste em português",
+              "priority": "low, medium, high ou critical",
+              "type": "functional, integration, performance, security ou usability",
+              "module": "Nome do módulo correspondente (ex: GO, Clock, Flow, Printer, Keep) ou string vazia se não aplicável"
+            }
+          ]
+        }
         
         IMPORTANTE:
-        - Retorne APENAS um objeto JSON, sem comentários ou markdown.
-        - O objeto DEVE conter exatamente as chaves acima.
+        - Retorne APENAS o objeto JSON com a chave "cases", sem comentários ou markdown.
         - TODO o conteúdo deve estar em PORTUGUÊS do Brasil.
+        - NUNCA use o texto "(Ver mais)" ou "(ver mais)" em nenhuma das respostas.
       `,
       description: 'Template padrão para gerar casos de teste baseados em um plano',
       parameters: ['testPlan', 'numCases'],
@@ -375,10 +393,42 @@ const defaultConfig: AIModelConfig = {
     'test-plan-generation': 'gemini-2.0-flash',
     'test-case-generation': 'gemini-2.0-flash',
     'test-execution-generation': 'gemini-2.0-flash',
-    'bug-detection': 'gemini-2.5-pro-preview-03-25',
-    'code-analysis': 'gemini-2.5-pro-preview-03-25',
     'general-completion': 'gemini-2.0-flash'
   }
+};
+
+// Sanitize configuration to clean obsolete capabilities/models
+export const sanitizeConfig = (config: AIModelConfig): AIModelConfig => {
+  const validTasks: AIModelTask[] = ['test-plan-generation', 'test-case-generation', 'test-execution-generation', 'general-completion'];
+  
+  // Filter out deprecated models
+  let models = config.models.filter(m => !DEPRECATED_MODEL_IDS.includes(m.id));
+  
+  // Clean obsolete capabilities
+  models = models.map(m => ({
+    ...m,
+    capabilities: m.capabilities.filter(cap => validTasks.includes(cap as AIModelTask))
+  }));
+  
+  // Fix tasks mapping
+  const validIds = new Set(models.map(m => m.id));
+  const tasks = {} as Record<AIModelTask, string>;
+  validTasks.forEach(task => {
+    const storedVal = config.tasks?.[task];
+    if (storedVal && validIds.has(storedVal) && !DEPRECATED_MODEL_IDS.includes(storedVal)) {
+      tasks[task] = storedVal;
+    } else {
+      const fallback = defaultConfig.tasks[task];
+      tasks[task] = validIds.has(fallback) ? fallback : (models[0]?.id ?? '');
+    }
+  });
+
+  return {
+    ...config,
+    models,
+    tasks,
+    promptTemplates: defaultConfig.promptTemplates // always use standard clean templates
+  };
 };
 
 // Normaliza payload validado pelo schema para o formato do DB
@@ -399,27 +449,18 @@ export const loadConfig = (): AIModelConfig => {
   let stored: AIModelConfig;
   try { stored = JSON.parse(raw); } catch { return defaultConfig; }
 
-  // Remove modelos depreciados
-  let models = stored.models.filter(m => !DEPRECATED_MODEL_IDS.includes(m.id));
-
-  // Adiciona novos modelos do defaultConfig que ainda não existem
-  const knownIds = new Set(models.map(m => m.id));
+  // Use the helper to sanitize
+  const sanitized = sanitizeConfig(stored);
+  
+  // Also merge any new models from defaultConfig that are missing
+  const knownIds = new Set(sanitized.models.map(m => m.id));
   const newModels = defaultConfig.models.filter(m => !knownIds.has(m.id));
-  models = [...models, ...newModels];
+  if (newModels.length > 0) {
+    sanitized.models = [...sanitized.models, ...newModels];
+  }
 
-  // Corrige referências de tarefas que apontavam para modelos depreciados
-  const validIds = new Set(models.map(m => m.id));
-  const tasks = { ...stored.tasks } as Record<AIModelTask, string>;
-  (Object.keys(tasks) as AIModelTask[]).forEach(task => {
-    if (!validIds.has(tasks[task]) || DEPRECATED_MODEL_IDS.includes(tasks[task])) {
-      const fallback = defaultConfig.tasks[task];
-      tasks[task] = validIds.has(fallback) ? fallback : (models[0]?.id ?? '');
-    }
-  });
-
-  const merged = { ...stored, models, tasks, promptTemplates: defaultConfig.promptTemplates };
-  localStorage.setItem(getMcpConfigKey(), JSON.stringify(merged));
-  return merged;
+  localStorage.setItem(getMcpConfigKey(), JSON.stringify(sanitized));
+  return sanitized;
 };
 
 // Save configuration to local storage
@@ -613,6 +654,228 @@ const parseJsonFromText = <T = unknown>(text: string): T => {
   return JSON.parse(text) as T;
 };
 
+// Helper function to execute a single completion attempt on a specific model slug
+const executeSingleAttempt = async (
+  model: AIModel,
+  prompt: string,
+  slug: string,
+  variables: Record<string, unknown>,
+  isGeneralCompletion: boolean,
+  schemaId?: SchemaId
+): Promise<unknown> => {
+  switch (model.provider) {
+    case 'gemini': {
+      // Verificar se há imagens nas variáveis para análise multimodal
+      const hasImages = variables.images && Array.isArray(variables.images) && variables.images.length > 0;
+
+      if (isGeneralCompletion) {
+        return generateText(prompt, slug);
+      }
+
+      let raw: unknown;
+      if (hasImages) {
+        // Usar função multimodal quando houver imagens
+        const imageUrls = variables.images as string[];
+        raw = await generateStructuredContentWithImages<unknown>(prompt, imageUrls, slug);
+      } else {
+        raw = await generateStructuredContent<unknown>(prompt, slug);
+      }
+
+      if (schemaId) {
+        try {
+          const valid = validateWithSchema(schemaId, raw);
+          return normalizeForDb(schemaId, valid);
+        } catch (err: unknown) {
+          const repaired = tryRepairWithSchema(schemaId, raw);
+          try {
+            const valid = validateWithSchema(schemaId, repaired);
+            return normalizeForDb(schemaId, valid);
+          } catch (err2: unknown) {
+            const msg = err2 instanceof Error ? err2.message : String(err2);
+            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
+          }
+        }
+      }
+      return raw;
+    }
+    case 'openai': {
+      const apiKey = (await getApiKeyForModel('openai', model.id)) || model.apiKey || '';
+      const text = await openAIGenerateText(prompt, slug, apiKey);
+      if (isGeneralCompletion) return text;
+      try {
+        const parsed = parseJsonFromText<unknown>(text);
+        if (!schemaId) return parsed;
+        try {
+          const valid = validateWithSchema(schemaId, parsed);
+          return normalizeForDb(schemaId, valid);
+        } catch (err: unknown) {
+          const repaired = tryRepairWithSchema(schemaId, parsed);
+          try {
+            const valid = validateWithSchema(schemaId, repaired);
+            return normalizeForDb(schemaId, valid);
+          } catch (err2: unknown) {
+            const msg = err2 instanceof Error ? err2.message : String(err2);
+            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
+          }
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`Erro ao analisar JSON da resposta OpenAI: ${msg}`);
+      }
+    }
+    case 'anthropic': {
+      const apiKey = (await getApiKeyForModel('anthropic', model.id)) || model.apiKey || '';
+      const text = await anthropicGenerateText(prompt, slug, apiKey);
+      if (isGeneralCompletion) return text;
+      try {
+        const parsed = parseJsonFromText<unknown>(text);
+        if (!schemaId) return parsed;
+        try {
+          const valid = validateWithSchema(schemaId, parsed);
+          return normalizeForDb(schemaId, valid);
+        } catch (err: unknown) {
+          const repaired = tryRepairWithSchema(schemaId, parsed);
+          try {
+            const valid = validateWithSchema(schemaId, repaired);
+            return normalizeForDb(schemaId, valid);
+          } catch (err2: unknown) {
+            const msg = err2 instanceof Error ? err2.message : String(err2);
+            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
+          }
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`Erro ao analisar JSON da resposta Anthropic: ${msg}`);
+      }
+    }
+    case 'groq': {
+      const apiKey = (await getApiKeyForModel('groq', model.id)) || model.apiKey || '';
+      const text = await groqGenerateText(prompt, slug, apiKey);
+      if (isGeneralCompletion) return text;
+      try {
+        const parsed = parseJsonFromText<unknown>(text);
+        if (!schemaId) return parsed;
+        try {
+          const valid = validateWithSchema(schemaId, parsed);
+          return normalizeForDb(schemaId, valid);
+        } catch (err: unknown) {
+          const repaired = tryRepairWithSchema(schemaId, parsed);
+          try {
+            const valid = validateWithSchema(schemaId, repaired);
+            return normalizeForDb(schemaId, valid);
+          } catch (err2: unknown) {
+            const msg = err2 instanceof Error ? err2.message : String(err2);
+            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
+          }
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`Erro ao analisar JSON da resposta Groq: ${msg}`);
+      }
+    }
+    case 'openrouter': {
+      const apiKey = (await getApiKeyForModel('openrouter', model.id)) || model.apiKey || '';
+
+      // Verifica se há slugs alternativos configurados para fallback
+      const adaptiveSlugs = model.settings?.adaptiveSlugs;
+      const customSlugs = Array.isArray(adaptiveSlugs)
+        ? adaptiveSlugs.filter((s: unknown) => typeof s === 'string')
+        : undefined;
+
+      // Usa modo adaptativo quando houver slugs customizados, quando explícito, ou se apenas gratuito for marcado
+      const useAdaptive = model.settings?.adaptiveMode === true || customSlugs?.length > 0 || model.settings?.onlyFreeModels === true;
+
+      let text: string;
+
+      if (useAdaptive) {
+        // Modo adaptativo: tenta múltiplos slugs
+        const result = await openRouterGenerateTextAdaptive(prompt, slug, apiKey, {
+          customSlugs,
+          temperature: 0.7,
+          maxRetries: 3,
+          onlyFreeModels: model.settings?.onlyFreeModels === true,
+          onSlugAttempt: (s, attempt, total) => {
+            console.debug(`[OpenRouter Adaptive] Tentativa ${attempt}/${total}: ${s}`);
+          },
+          onFallback: (failed, next) => {
+            console.debug(`[OpenRouter Adaptive] ${failed} falhou, tentando ${next}`);
+          },
+        });
+        text = result.content;
+      } else {
+        // Modo simples: um único slug
+        text = await openRouterGenerateText(prompt, slug, apiKey);
+      }
+
+      if (isGeneralCompletion) return text;
+      try {
+        const parsed = parseJsonFromText<unknown>(text);
+        if (!schemaId) return parsed;
+        try {
+          const valid = validateWithSchema(schemaId, parsed);
+          return normalizeForDb(schemaId, valid);
+        } catch (err: unknown) {
+          const repaired = tryRepairWithSchema(schemaId, parsed);
+          try {
+            const valid = validateWithSchema(schemaId, repaired);
+            return normalizeForDb(schemaId, valid);
+          } catch (err2: unknown) {
+            const msg = err2 instanceof Error ? err2.message : String(err2);
+            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
+          }
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`Erro ao analisar JSON da resposta OpenRouter: ${msg}`);
+      }
+    }
+    case 'ollama': {
+      const baseUrl = (model.settings && model.settings.baseUrl) ? model.settings.baseUrl : undefined;
+      const text = await ollamaGenerateText(prompt, slug, baseUrl);
+      if (isGeneralCompletion) return text;
+      try {
+        const parsed = parseJsonFromText<unknown>(text);
+        if (!schemaId) return parsed;
+        try {
+          const valid = validateWithSchema(schemaId, parsed);
+          return normalizeForDb(schemaId, valid);
+        } catch (err: unknown) {
+          const repaired = tryRepairWithSchema(schemaId, parsed);
+          try {
+            const valid = validateWithSchema(schemaId, repaired);
+            return normalizeForDb(schemaId, valid);
+          } catch (err2: unknown) {
+            const msg = err2 instanceof Error ? err2.message : String(err2);
+            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
+          }
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(`Erro ao analisar JSON da resposta Ollama: ${msg}`);
+      }
+    }
+    default:
+      throw new Error(`Unsupported model provider: ${model.provider}`);
+  }
+};
+
+const cleanVerMais = (obj: any): any => {
+  if (typeof obj === 'string') {
+    return obj.replace(/\s*\(\s*[Vv]er\s+[Mm]ais\s*\)/gi, '').trim();
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanVerMais);
+  }
+  if (obj && typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const key of Object.keys(obj)) {
+      cleaned[key] = cleanVerMais(obj[key]);
+    }
+    return cleaned;
+  }
+  return obj;
+};
+
 // Execute a task with a specific model and template
 export const executeTask = async (
   task: AIModelTask,
@@ -683,219 +946,39 @@ export const executeTask = async (
   const languageGuard = '\n\n[IDIOMA]\nResponda ESTRITAMENTE em PORTUGUÊS do Brasil (pt-BR) em todo o conteúdo gerado. Nunca use inglês.\n';
   const prompt = `${basePrompt}${languageGuard}`;
 
-  // Execute baseado no provider
-  switch (model.provider) {
-    case 'gemini': {
-      const geminiModelName = (model.settings && typeof model.settings.apiModel === 'string' && model.settings.apiModel.trim())
-        ? model.settings.apiModel.trim()
-        : model.id;
+  const apiModelName = (model.settings && typeof model.settings.apiModel === 'string' && model.settings.apiModel.trim())
+    ? model.settings.apiModel.trim()
+    : model.id;
 
-      // Verificar se há imagens nas variáveis para análise multimodal
-      const hasImages = variables.images && Array.isArray(variables.images) && variables.images.length > 0;
+  const adaptiveSlugs = model.settings?.adaptiveSlugs;
+  const customSlugs = Array.isArray(adaptiveSlugs)
+    ? adaptiveSlugs.filter((s: unknown) => typeof s === 'string')
+    : [];
 
-      if (isGeneralCompletion) {
-        return generateText(prompt, geminiModelName);
-      }
+  const useAdaptive = model.settings?.adaptiveMode === true || customSlugs.length > 0 || model.settings?.onlyFreeModels === true;
 
-      let raw: unknown;
-      if (hasImages) {
-        // Usar função multimodal quando houver imagens
-        const imageUrls = variables.images as string[];
-        raw = await generateStructuredContentWithImages<unknown>(prompt, imageUrls, geminiModelName);
-      } else {
-        raw = await generateStructuredContent<unknown>(prompt, geminiModelName);
-      }
-
-      if (schemaId) {
-        try {
-          const valid = validateWithSchema(schemaId, raw);
-          return normalizeForDb(schemaId, valid);
-        } catch (err: unknown) {
-          const repaired = tryRepairWithSchema(schemaId, raw);
-          try {
-            const valid = validateWithSchema(schemaId, repaired);
-            return normalizeForDb(schemaId, valid);
-          } catch (err2: unknown) {
-            const msg = err2 instanceof Error ? err2.message : String(err2);
-            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
-          }
-        }
-      }
-      return raw;
-    }
-    case 'openai': {
-      const apiModelName = (model.settings && typeof model.settings.apiModel === 'string' && model.settings.apiModel.trim())
-        ? model.settings.apiModel.trim()
-        : model.id;
-      const apiKey = (await getApiKeyForModel('openai', model.id)) || model.apiKey || '';
-      const text = await openAIGenerateText(prompt, apiModelName, apiKey);
-      if (isGeneralCompletion) return text;
+  if (useAdaptive && model.provider !== 'openrouter') {
+    // Roteamento adaptativo genérico para outros provedores
+    const slugsToTry = [apiModelName, ...customSlugs];
+    const errors: string[] = [];
+    for (let i = 0; i < slugsToTry.length; i++) {
+      const currentSlug = slugsToTry[i];
       try {
-        const parsed = parseJsonFromText<unknown>(text);
-        if (!schemaId) return parsed;
-        try {
-          const valid = validateWithSchema(schemaId, parsed);
-          return normalizeForDb(schemaId, valid);
-        } catch (err: unknown) {
-          const repaired = tryRepairWithSchema(schemaId, parsed);
-          try {
-            const valid = validateWithSchema(schemaId, repaired);
-            return normalizeForDb(schemaId, valid);
-          } catch (err2: unknown) {
-            const msg = err2 instanceof Error ? err2.message : String(err2);
-            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
-          }
+        if (import.meta.env.DEV) {
+          console.debug(`[Adaptive Routing ${model.provider}] Tentativa ${i + 1}/${slugsToTry.length}: ${currentSlug}`);
         }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`Erro ao analisar JSON da resposta OpenAI: ${msg}`);
+        const attemptResult = await executeSingleAttempt(model, prompt, currentSlug, variables, isGeneralCompletion, schemaId);
+        return isGeneralCompletion ? attemptResult : cleanVerMais(attemptResult);
+      } catch (err: any) {
+        errors.push(`${currentSlug}: ${err.message || err}`);
       }
     }
-    case 'anthropic': {
-      const apiModelName = (model.settings && typeof model.settings.apiModel === 'string' && model.settings.apiModel.trim())
-        ? model.settings.apiModel.trim()
-        : model.id;
-      const apiKey = (await getApiKeyForModel('anthropic', model.id)) || model.apiKey || '';
-      const text = await anthropicGenerateText(prompt, apiModelName, apiKey);
-      if (isGeneralCompletion) return text;
-      try {
-        const parsed = parseJsonFromText<unknown>(text);
-        if (!schemaId) return parsed;
-        try {
-          const valid = validateWithSchema(schemaId, parsed);
-          return normalizeForDb(schemaId, valid);
-        } catch (err: unknown) {
-          const repaired = tryRepairWithSchema(schemaId, parsed);
-          try {
-            const valid = validateWithSchema(schemaId, repaired);
-            return normalizeForDb(schemaId, valid);
-          } catch (err2: unknown) {
-            const msg = err2 instanceof Error ? err2.message : String(err2);
-            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
-          }
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`Erro ao analisar JSON da resposta Anthropic: ${msg}`);
-      }
-    }
-    case 'groq': {
-      const apiModelName = (model.settings && typeof model.settings.apiModel === 'string' && model.settings.apiModel.trim())
-        ? model.settings.apiModel.trim()
-        : model.id;
-      const apiKey = (await getApiKeyForModel('groq', model.id)) || model.apiKey || '';
-      const text = await groqGenerateText(prompt, apiModelName, apiKey);
-      if (isGeneralCompletion) return text;
-      try {
-        const parsed = parseJsonFromText<unknown>(text);
-        if (!schemaId) return parsed;
-        try {
-          const valid = validateWithSchema(schemaId, parsed);
-          return normalizeForDb(schemaId, valid);
-        } catch (err: unknown) {
-          const repaired = tryRepairWithSchema(schemaId, parsed);
-          try {
-            const valid = validateWithSchema(schemaId, repaired);
-            return normalizeForDb(schemaId, valid);
-          } catch (err2: unknown) {
-            const msg = err2 instanceof Error ? err2.message : String(err2);
-            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
-          }
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`Erro ao analisar JSON da resposta Groq: ${msg}`);
-      }
-    }
-    case 'openrouter': {
-      const apiModelName = (model.settings && typeof model.settings.apiModel === 'string' && model.settings.apiModel.trim())
-        ? model.settings.apiModel.trim()
-        : model.id;
-      const apiKey = (await getApiKeyForModel('openrouter', model.id)) || model.apiKey || '';
-
-      // Verifica se há slugs alternativos configurados para fallback
-      const adaptiveSlugs = model.settings?.adaptiveSlugs;
-      const customSlugs = Array.isArray(adaptiveSlugs)
-        ? adaptiveSlugs.filter((s: unknown) => typeof s === 'string')
-        : undefined;
-
-      // Usa modo adaptativo quando houver slugs customizados ou quando explícito
-      const useAdaptive = model.settings?.adaptiveMode === true || customSlugs?.length > 0;
-
-      let text: string;
-
-      if (useAdaptive) {
-        // Modo adaptativo: tenta múltiplos slugs
-        const result = await openRouterGenerateTextAdaptive(prompt, apiModelName, apiKey, {
-          customSlugs,
-          temperature: 0.7,
-          maxRetries: 3,
-          onSlugAttempt: (slug, attempt, total) => {
-            console.debug(`[OpenRouter Adaptive] Tentativa ${attempt}/${total}: ${slug}`);
-          },
-          onFallback: (failed, next) => {
-            console.debug(`[OpenRouter Adaptive] ${failed} falhou, tentando ${next}`);
-          },
-        });
-        text = result.content;
-      } else {
-        // Modo simples: um único slug
-        text = await openRouterGenerateText(prompt, apiModelName, apiKey);
-      }
-
-      if (isGeneralCompletion) return text;
-      try {
-        const parsed = parseJsonFromText<unknown>(text);
-        if (!schemaId) return parsed;
-        try {
-          const valid = validateWithSchema(schemaId, parsed);
-          return normalizeForDb(schemaId, valid);
-        } catch (err: unknown) {
-          const repaired = tryRepairWithSchema(schemaId, parsed);
-          try {
-            const valid = validateWithSchema(schemaId, repaired);
-            return normalizeForDb(schemaId, valid);
-          } catch (err2: unknown) {
-            const msg = err2 instanceof Error ? err2.message : String(err2);
-            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
-          }
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`Erro ao analisar JSON da resposta OpenRouter: ${msg}`);
-      }
-    }
-    case 'ollama': {
-      const baseUrl = (model.settings && model.settings.baseUrl) ? model.settings.baseUrl : undefined;
-      const apiModelName = (model.settings && typeof model.settings.apiModel === 'string' && model.settings.apiModel.trim())
-        ? model.settings.apiModel.trim()
-        : model.id;
-      const text = await ollamaGenerateText(prompt, apiModelName, baseUrl);
-      if (isGeneralCompletion) return text;
-      try {
-        const parsed = parseJsonFromText<unknown>(text);
-        if (!schemaId) return parsed;
-        try {
-          const valid = validateWithSchema(schemaId, parsed);
-          return normalizeForDb(schemaId, valid);
-        } catch (err: unknown) {
-          const repaired = tryRepairWithSchema(schemaId, parsed);
-          try {
-            const valid = validateWithSchema(schemaId, repaired);
-            return normalizeForDb(schemaId, valid);
-          } catch (err2: unknown) {
-            const msg = err2 instanceof Error ? err2.message : String(err2);
-            throw new Error(`Validação de schema (${schemaId}) falhou após tentativa de reparo: ${msg}`);
-          }
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`Erro ao analisar JSON da resposta Ollama: ${msg}`);
-      }
-    }
-    default:
-      throw new Error(`Unsupported model provider: ${model.provider}`);
+    throw new Error(`Todos os slugs para ${model.provider} falharam: ${errors.join(' | ')}`);
   }
+
+  // Executa com o slug padrão (ou usa adaptive interno do OpenRouter)
+  const rawResult = await executeSingleAttempt(model, prompt, apiModelName, variables, isGeneralCompletion, schemaId);
+  return isGeneralCompletion ? rawResult : cleanVerMais(rawResult);
 };
 
 // Save MCP config to Supabase for the user
@@ -959,7 +1042,7 @@ export const loadMCPConfigFromSupabase = async (userId: string): Promise<AIModel
 
     // Chaves ficam no backend criptografadas. Nao copiamos para o objeto model aqui.
     // A presenca e verificada via hasStoredKey(); a chave real e recuperada em getApiKeyForModel().
-    return config;
+    return sanitizeConfig(config);
   } catch (error) {
     console.error('Error loading MCP config from Supabase:', error);
     return null;
@@ -1048,6 +1131,7 @@ export const fetchProviderModels = async (
         id: m.id,
         name: m.name || m.id,
         description: m.description,
+        pricing: m.pricing
       }));
     }
     case 'anthropic': {

@@ -87,11 +87,19 @@ export const TestPlans = () => {
   } | null>(null);
   const [planStats, setPlanStats] = useState<Record<string, { cases: number; execs: number }>>({});
 
-  // Listener para broadcast de troca de projeto
+  // Listener para broadcast de troca de projeto ou alterações nos planos/casos/execuções
   useEffect(() => {
     const handler = () => loadPlans();
     window.addEventListener('krg:project-changed', handler as EventListener);
-    return () => window.removeEventListener('krg:project-changed', handler as EventListener);
+    window.addEventListener('nexus:plans-changed', handler as EventListener);
+    window.addEventListener('nexus:cases-changed', handler as EventListener);
+    window.addEventListener('nexus:executions-changed', handler as EventListener);
+    return () => {
+      window.removeEventListener('krg:project-changed', handler as EventListener);
+      window.removeEventListener('nexus:plans-changed', handler as EventListener);
+      window.removeEventListener('nexus:cases-changed', handler as EventListener);
+      window.removeEventListener('nexus:executions-changed', handler as EventListener);
+    };
   }, []);
   
   // Carregar planos reais do Supabase

@@ -108,11 +108,15 @@ export const TestExecutions = () => {
     localStorage.setItem('testExecutions_viewMode', viewMode);
   }, [viewMode]);
 
-  // Listener para troca de projeto global
+  // Listener para troca de projeto global ou alteração nas execuções
   useEffect(() => {
     const handler = () => loadExecutions();
     window.addEventListener('krg:project-changed', handler as EventListener);
-    return () => window.removeEventListener('krg:project-changed', handler as EventListener);
+    window.addEventListener('nexus:executions-changed', handler as EventListener);
+    return () => {
+      window.removeEventListener('krg:project-changed', handler as EventListener);
+      window.removeEventListener('nexus:executions-changed', handler as EventListener);
+    };
   }, []);
 
   // Abrir modal automaticamente se houver ?id=

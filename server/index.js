@@ -87,7 +87,9 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 app.use('/uploads', express.static(uploadsDir));
 
 // Rate limit simples em memoria para rotas de autenticacao
@@ -224,17 +226,17 @@ function buildWhere(filters = [], params = []) {
 }
 
 function normalizeRows(table, rows) {
+  let normalized = rows;
   if (table === 'user_permissions') {
-    return rows.map((row) => {
+    normalized = rows.map((row) => {
       const norm = { ...row };
       for (const col of BOOL_PERM_COLS) {
         if (col in norm) norm[col] = norm[col] === 1 || norm[col] === true;
       }
       return norm;
     });
-  }
-  if (table === 'profiles') {
-    return rows.map((row) => {
+  } else if (table === 'profiles') {
+    normalized = rows.map((row) => {
       const { password_hash, ...rest } = row;
       return {
         ...rest,
@@ -244,36 +246,40 @@ function normalizeRows(table, rows) {
           : (Array.isArray(row.tags) ? row.tags : []),
       };
     });
-  }
-  if (table === 'test_cases') {
-    return rows.map((row) => ({
+  } else if (table === 'test_cases') {
+    normalized = rows.map((row) => ({
       ...row,
       steps: typeof row.steps === 'string'
         ? (() => { try { return JSON.parse(row.steps); } catch { return []; } })()
         : (Array.isArray(row.steps) ? row.steps : []),
-      interested_users: typeof row.interested_users === 'string'
-        ? (() => { try { return JSON.parse(row.interested_users); } catch { return []; } })()
-        : (Array.isArray(row.interested_users) ? row.interested_users : []),
     }));
-  }
-  if (table === 'activity_logs') {
-    return rows.map((row) => ({
+  } else if (table === 'activity_logs') {
+    normalized = rows.map((row) => ({
       ...row,
       metadata: typeof row.metadata === 'string'
         ? (() => { try { return JSON.parse(row.metadata); } catch { return {}; } })()
         : (row.metadata && typeof row.metadata === 'object' ? row.metadata : {}),
     }));
   }
-  // Universal: parse interested_users if it exists as string
-  return rows.map((row) => {
-    if (typeof row.interested_users === 'string') {
+
+  // Universal: parse interested_users and images if they exist as string
+  return normalized.map((row) => {
+    const copy = { ...row };
+    if (typeof copy.interested_users === 'string') {
       try {
-        row.interested_users = JSON.parse(row.interested_users);
+        copy.interested_users = JSON.parse(copy.interested_users);
       } catch {
-        row.interested_users = [];
+        copy.interested_users = [];
       }
     }
-    return row;
+    if (typeof copy.images === 'string') {
+      try {
+        copy.images = JSON.parse(copy.images);
+      } catch {
+        copy.images = [];
+      }
+    }
+    return copy;
   });
 }
 
@@ -291,6 +297,9 @@ function serializeForDb(table, values) {
   }
   if (Array.isArray(result.interested_users)) {
     result.interested_users = JSON.stringify(result.interested_users);
+  }
+  if (Array.isArray(result.images)) {
+    result.images = JSON.stringify(result.images);
   }
   return result;
 }
@@ -372,6 +381,9 @@ function getNextSequence(table, projectId = null) {
     'ALTER TABLE test_executions ADD COLUMN interested_users TEXT DEFAULT \'[]\'',
     'ALTER TABLE defects ADD COLUMN interested_users TEXT DEFAULT \'[]\'',
     'ALTER TABLE test_plans ADD COLUMN interested_users TEXT DEFAULT \'[]\'',
+    'ALTER TABLE test_plans ADD COLUMN images TEXT DEFAULT \'[]\'',
+    'ALTER TABLE test_cases ADD COLUMN images TEXT DEFAULT \'[]\'',
+    'ALTER TABLE test_executions ADD COLUMN images TEXT DEFAULT \'[]\'',
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch (e) {
@@ -483,6 +495,17 @@ function getNextSequence(table, projectId = null) {
   }
 
   _tableColsCache.clear();
+
+  // Limpeza automática de imagens expiradas (> 30 dias) em planos e casos de teste
+  try {
+    const cleanPlans = db.prepare("UPDATE test_plans SET images = '[]' WHERE created_at < datetime('now', '-30 days') AND images != '[]' AND images IS NOT NULL").run();
+    const cleanCases = db.prepare("UPDATE test_cases SET images = '[]' WHERE created_at < datetime('now', '-30 days') AND images != '[]' AND images IS NOT NULL").run();
+    if (cleanPlans.changes > 0 || cleanCases.changes > 0) {
+      logger.info(`[db-cleanup] Removidas imagens expiradas de ${cleanPlans.changes} planos e ${cleanCases.changes} casos de teste.`);
+    }
+  } catch (e) {
+    logger.error('[db-cleanup] Erro na limpeza automática de imagens:', e.message);
+  }
 }
 
 
@@ -1138,59 +1161,112 @@ app.post('/api/reports/aggregate', requireUser, async (req, res, next) => {
 });
 
 // Extrai texto e imagens de arquivos .pptx
+// Retorna TODAS as imagens por slide agrupadas por número de slide
+// (slide com 2 capturas side-by-side gera slide_N_1 e slide_N_2)
 async function extractFromPptx(filePath) {
   try {
     const data = await fs.readFile(filePath);
     const zip = await JSZip.loadAsync(data);
 
-    // Extrair texto dos slides
-    const slideFiles = Object.keys(zip.files).filter(n => n.startsWith('ppt/slides/slide') && n.endsWith('.xml'));
-    slideFiles.sort((a, b) => {
-      const numA = parseInt(a.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
-      const numB = parseInt(b.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
-      return numA - numB;
-    });
+    const slideFiles = Object.keys(zip.files)
+      .filter(n => n.startsWith('ppt/slides/slide') && n.endsWith('.xml'))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
+        const numB = parseInt(b.match(/slide(\d+)\.xml$/)?.[1] || '0', 10);
+        return numA - numB;
+      });
+
     const texts = [];
+    // slideNum → ordered array of {mediaPath, rId} (order = relationship declaration order)
+    const slideMediaMap = new Map();
+    const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
+
     for (const slideFile of slideFiles) {
+      const slideNumMatch = slideFile.match(/slide(\d+)\.xml$/);
+      if (!slideNumMatch) continue;
+      const slideNum = parseInt(slideNumMatch[1], 10);
+
+      // Extract text
       const xml = await zip.files[slideFile].async('text');
       const parser = new DOMParser();
       const doc = parser.parseFromString(xml, 'text/xml');
       const tNodes = doc.getElementsByTagName('a:t');
       const slideTexts = [];
       for (let i = 0; i < tNodes.length; i++) {
-        const text = tNodes[i].textContent || '';
-        if (text.trim()) slideTexts.push(text);
+        const t = tNodes[i].textContent || '';
+        if (t.trim()) slideTexts.push(t);
       }
       if (slideTexts.length) {
-        texts.push(`=== Slide ${slideFile.match(/slide(\d+)\.xml$/)?.[1] || '?'} ===\n${slideTexts.join('\n')}`);
+        texts.push(`=== Slide ${slideNum} ===\n${slideTexts.join('\n')}`);
+      }
+
+      // Read relationships — preserve declaration order (= visual order in slide)
+      const relFile = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+      const mediaList = [];
+      if (zip.files[relFile]) {
+        try {
+          const relXml = await zip.files[relFile].async('text');
+          const relParser = new DOMParser();
+          const relDoc = relParser.parseFromString(relXml, 'text/xml');
+          const rels = relDoc.getElementsByTagName('Relationship');
+          for (let i = 0; i < rels.length; i++) {
+            const type = rels[i].getAttribute('Type') || '';
+            const target = rels[i].getAttribute('Target') || '';
+            const rId = rels[i].getAttribute('Id') || `r${i}`;
+            if (type.includes('/image') && target) {
+              const cleanTarget = target.replace(/^\.\.\//, 'ppt/');
+              if (zip.files[cleanTarget]) {
+                const lowerExt = cleanTarget.toLowerCase();
+                if (imageExts.some(e => lowerExt.endsWith(e))) {
+                  mediaList.push({ mediaPath: cleanTarget, rId });
+                }
+              }
+            }
+          }
+        } catch (relErr) {
+          logger.warn(`Erro ao ler relações de slide ${slideNum}:`, relErr.message);
+        }
+      }
+
+      if (mediaList.length > 0) {
+        slideMediaMap.set(slideNum, mediaList);
       }
     }
 
-    // Extrair imagens (ppt/media/)
+    // Extract ALL images per slide, naming slide_N.ext (single) or slide_N_1.ext / slide_N_2.ext (multiple)
     const images = [];
-    const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
-    const mediaFiles = Object.keys(zip.files).filter(n => {
-      const lower = n.toLowerCase();
-      return n.startsWith('ppt/media/') && imageExts.some(ext => lower.endsWith(ext));
-    });
+    for (const [slideNum, mediaList] of slideMediaMap.entries()) {
+      const hasMultiple = mediaList.length > 1;
+      for (let idx = 0; idx < mediaList.length; idx++) {
+        const { mediaPath } = mediaList[idx];
+        try {
+          const ext = path.extname(mediaPath).toLowerCase().replace('.', '');
+          const mime = ext === 'jpg' ? 'jpeg' : ext;
+          const buffer = await zip.files[mediaPath].async('nodebuffer');
+          const base64 = buffer.toString('base64');
+          if (base64.length > 10 * 1024 * 1024) continue; // skip > 10MB
 
-    for (const mediaFile of mediaFiles) {
-      try {
-        const ext = path.extname(mediaFile).toLowerCase().replace('.', '');
-        const mime = ext === 'jpg' ? 'jpeg' : ext;
-        const buffer = await zip.files[mediaFile].async('nodebuffer');
-        const base64 = buffer.toString('base64');
-        // Limitar tamanho da imagem (max 2MB base64 ~ 1.5MB binário)
-        if (base64.length > 2 * 1024 * 1024) continue;
-        images.push({
-          name: path.basename(mediaFile),
-          dataUrl: `data:image/${mime};base64,${base64}`,
-          slide: null // Podemos mapear para slides posteriorente se necessário
-        });
-      } catch (imgErr) {
-        logger.warn(`Erro ao extrair imagem ${mediaFile}:`, imgErr.message);
+          const name = hasMultiple
+            ? `slide_${slideNum}_${idx + 1}.${ext}`
+            : `slide_${slideNum}.${ext}`;
+
+          images.push({
+            name,
+            dataUrl: `data:image/${mime};base64,${base64}`,
+            slides: [slideNum]
+          });
+        } catch (imgErr) {
+          logger.warn(`Erro ao extrair imagem do slide ${slideNum} [${idx}]:`, imgErr.message);
+        }
       }
     }
+
+    // Sort: by slide number, then by position within slide
+    images.sort((a, b) => {
+      const sA = a.slides[0] || 0, sB = b.slides[0] || 0;
+      if (sA !== sB) return sA - sB;
+      return a.name.localeCompare(b.name);
+    });
 
     return { text: texts.join('\n\n'), images };
   } catch (e) {
@@ -1199,6 +1275,8 @@ async function extractFromPptx(filePath) {
 }
 
 app.post('/api/storage/upload', requireUser, upload.single('file'), async (req, res) => {
+
+
   res.json({ path: req.file.filename, publicUrl: '/uploads/' + req.file.filename });
 });
 

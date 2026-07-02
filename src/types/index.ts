@@ -25,6 +25,7 @@ export interface TestPlan {
   // Número sequencial opcional para exibição amigável (preenchido via migração)
   sequence?: number;
   interested_users?: string[];
+  images?: Array<{ name: string; dataUrl: string; slides?: number[] }>;
 }
 
 export interface TestCase {
@@ -46,6 +47,7 @@ export interface TestCase {
   sequence?: number;
   branches?: string;
   interested_users?: string[];
+  images?: Array<{ name: string; dataUrl: string; slides?: number[] }>;
 }
 
 export interface TestStep {
@@ -70,6 +72,7 @@ export interface TestExecution {
   // Número sequencial opcional para exibição amigável (preenchido via migração)
   sequence?: number;
   interested_users?: string[];
+  images?: Array<{ name: string; dataUrl: string; slides?: number[] }>;
 }
 
 // Test Run (Ciclo de Execução) — agrupa execuções por sprint/release/cycle
@@ -163,8 +166,6 @@ export type AIModelTask =
   | 'test-plan-generation'
   | 'test-case-generation'
   | 'test-execution-generation'
-  | 'bug-detection'
-  | 'code-analysis'
   | 'general-completion';
 
 export interface AIPromptTemplate {

@@ -150,15 +150,15 @@ export const deleteProjectCascade = async (projectId: string): Promise<void> => 
     if (executionIds.length) {
       await apiClient.from('defects').delete().in('execution_id', executionIds);
     }
-  } catch {}
+  } catch { /* ignore */ }
   try {
     if (caseIds.length) {
       await apiClient.from('defects').delete().in('case_id', caseIds);
     }
-  } catch {}
+  } catch { /* ignore */ }
   try {
     await apiClient.from('defects').delete().eq('project_id', projectId);
-  } catch {}
+  } catch { /* ignore */ }
 
   // 5) Requisitos do projeto e vínculos requisito↔caso
   // 5.1) Buscar IDs de requisitos do projeto
@@ -170,45 +170,45 @@ export const deleteProjectCascade = async (projectId: string): Promise<void> => 
       .eq('project_id', projectId);
     if (reqErr) throw reqErr;
     requirementIds = (reqs || []).map(r => r.id);
-  } catch {}
+  } catch { /* ignore */ }
 
   // 5.2) Excluir vínculos por case_id (já filtrado acima) e também por requirement_id
   try {
     if (caseIds.length) {
       await apiClient.from('requirements_cases').delete().in('case_id', caseIds);
     }
-  } catch {}
+  } catch { /* ignore */ }
   try {
     if (requirementIds.length) {
       await apiClient.from('requirements_cases').delete().in('requirement_id', requirementIds);
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   // 5.3) Excluir requisitos do projeto
   try {
     await apiClient.from('requirements').delete().eq('project_id', projectId);
-  } catch {}
+  } catch { /* ignore */ }
 
   // 6) Execuções
   try {
     if (executionIds.length) {
       await apiClient.from('test_executions').delete().in('id', executionIds);
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   // 7) Casos
   try {
     if (caseIds.length) {
       await apiClient.from('test_cases').delete().in('id', caseIds);
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   // 8) Planos
   try {
     if (planIds.length) {
       await apiClient.from('test_plans').delete().in('id', planIds);
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   // 9) Projeto
   const { error: projErr } = await apiClient.from('projects').delete().eq('id', projectId);

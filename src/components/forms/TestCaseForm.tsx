@@ -16,6 +16,7 @@ import { StandardButton } from '@/components/StandardButton';
 import { useProjectUsers } from '@/hooks/useProjectUsers';
 import { UserMultiSelectField } from '@/components/forms/UserMultiSelectField';
 import { apiClient as supabase } from '@/lib/api';
+import { ImageAttachmentZone } from '@/components/ImageAttachmentZone';
 
 interface TestCaseFormProps {
   onSuccess?: (testCase: TestCase) => void;
@@ -45,8 +46,10 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
     type: 'functional' as const,
     plan_id: planId || '',
     branches: '',
-    assigned_to: '',
-    interested_users: [] as string[]
+    // On create: auto-assign to current user; on edit: useEffect below will override
+    assigned_to: user?.id || '',
+    interested_users: [] as string[],
+    images: [] as Array<{ name: string; dataUrl: string; slides?: number[] }>
   });
   const { users, labelFor } = useProjectUsers();
   const [steps, setSteps] = useState<TestStep[]>([
@@ -77,7 +80,8 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
         plan_id: initialData.plan_id || planId || '',
         branches: (initialData as any).branches || '',
         assigned_to: (initialData as any).assigned_to || '',
-        interested_users: (initialData as any).interested_users || []
+        interested_users: (initialData as any).interested_users || [],
+        images: (initialData as any).images || []
       });
       setSteps(
         (Array.isArray(initialData.steps) && initialData.steps.length > 0)
@@ -95,8 +99,8 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
   // Hydrate draft from localStorage (draft takes precedence over prefill)
   useEffect(() => {
     // Cleanup drafts legados (sem escopo) para evitar preencher com dados antigos
-    try { localStorage.removeItem('draft:testcase:new'); } catch {}
-    try { if (initialData?.id) localStorage.removeItem(`draft:testcase:edit:${initialData.id}`); } catch {}
+    try { localStorage.removeItem('draft:testcase:new'); } catch { /* ignore */ }
+    try { if (initialData?.id) localStorage.removeItem(`draft:testcase:edit:${initialData.id}`); } catch { /* ignore */ }
 
     try {
       const raw = localStorage.getItem(getDraftKey());
@@ -134,6 +138,7 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
           priority: (draft.formData as any).priority || prev.priority,
           type: (draft.formData as any).type || prev.type,
           plan_id: draft.formData!.plan_id || prev.plan_id,
+          images: (draft.formData as any).images || prev.images,
         }));
       }
 
@@ -246,9 +251,9 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
               status: 'open',
             } as any);
             await linkCaseToRequirement(user.id, newReq.id, testCase.id);
-          } catch {}
+          } catch { /* ignore */ }
         } else if (reqMode === 'link' && requirementId) {
-          try { await linkCaseToRequirement(user.id, requirementId, testCase.id); } catch {}
+          try { await linkCaseToRequirement(user.id, requirementId, testCase.id); } catch { /* ignore */ }
         }
       }
 
@@ -442,6 +447,12 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
           className="bg-muted/30 border-border/60 focus:border-brand/50 focus:ring-0 resize-none"
         />
       </div>
+
+      <ImageAttachmentZone 
+        images={formData.images} 
+        onChange={(imgs) => handleChange('images', imgs)}
+        showWarning={true}
+      />
 
       {/* Campos avançados */}
       <button

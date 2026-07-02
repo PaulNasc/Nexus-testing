@@ -365,3 +365,36 @@
 .animate-ring-pulse {
   animation: ring-pulse 1.5s infinite;
 }
+
+/* Global Reset of Focus Rings for Cleaner Look */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+button:focus,
+button:focus-visible {
+  outline: none !important;
+  --tw-ring-offset-width: 0px !important;
+  --tw-ring-offset-color: transparent !important;
+  --tw-ring-color: transparent !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+  box-shadow: none !important;
+}
+
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-toast-progress {
+  animation-name: toast-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}

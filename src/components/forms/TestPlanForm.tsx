@@ -16,6 +16,7 @@ import { StatusManagerModal } from '@/components/StatusManagerModal';
 import { ChevronDown, ChevronUp, Plus, User as UserIcon } from 'lucide-react';
 import { useProjectUsers } from '@/hooks/useProjectUsers';
 import { UserMultiSelectField } from '@/components/forms/UserMultiSelectField';
+import { ImageAttachmentZone } from '@/components/ImageAttachmentZone';
 
 interface TestPlanFormProps {
   onSuccess?: (plan: TestPlan) => void;
@@ -41,8 +42,10 @@ export const TestPlanForm = ({ onSuccess, onCancel, initialData }: TestPlanFormP
     risks: initialData?.risks || '',
     status: initialData?.status || 'draft',
     project_id: initialData?.project_id || currentProject?.id || '',
-    assigned_to: (initialData as any)?.assigned_to || '',
-    interested_users: initialData?.interested_users || []
+    // On create: auto-assign to current user; on edit: preserve existing
+    assigned_to: (initialData as any)?.assigned_to || user?.id || '',
+    interested_users: initialData?.interested_users || [],
+    images: initialData?.images || []
   });
 
   const { users, labelFor } = useProjectUsers();
@@ -220,6 +223,12 @@ export const TestPlanForm = ({ onSuccess, onCancel, initialData }: TestPlanFormP
         />
       </div>
 
+      <ImageAttachmentZone 
+        images={formData.images} 
+        onChange={(imgs) => handleChange('images', imgs)}
+        showWarning={true}
+      />
+
       {/* Campos avançados colapsáveis */}
       <button
         type="button"
@@ -275,7 +284,7 @@ export const TestPlanForm = ({ onSuccess, onCancel, initialData }: TestPlanFormP
       {/* Footer */}
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
         {onCancel && (
-          <StandardButton type="button" variant="outline" onClick={() => { try { localStorage.removeItem(storageKey); } catch {} onCancel?.(); }}>
+          <StandardButton type="button" variant="outline" onClick={() => { try { localStorage.removeItem(storageKey); } catch { /* ignore */ } onCancel?.(); }}>
             Cancelar
           </StandardButton>
         )}

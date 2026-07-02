@@ -193,7 +193,7 @@ export const UserProfileModal: React.FC<{
               const { data: gData } = await supabase.from('groups' as any).select('name, color').in('id', groupIds);
               if (gData) setTags(gData.map((g: any) => ({ label: g.name, color: g.color, icon: 'tag' })));
             }
-          } catch {}
+          } catch { /* ignore */ }
           return;
         }
         // Minimal fallback
