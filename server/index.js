@@ -1032,17 +1032,41 @@ app.get('/api/reports/dashboard', requireUser, (req, res, next) => {
     `, params).rows;
 
     // 5. Recent items (combined)
-    // Para simplificar e manter performance, pegamos os ultimos de cada e unimos no JS
-    const recentPlans = query(`SELECT id, title, updated_at, generated_by_ai FROM test_plans ${whereProject} ORDER BY updated_at DESC LIMIT 5`, params).rows.map(r => ({ ...r, type: 'plan' }));
-    const recentCases = query(`SELECT id, title, updated_at, generated_by_ai FROM test_cases ${whereProject} ORDER BY updated_at DESC LIMIT 5`, params).rows.map(r => ({ ...r, type: 'case' }));
-    const recentExecs = query(`SELECT id, 'Execução #' || substr(id, 1, 6) as title, executed_at as updated_at FROM test_executions ${whereProject} ORDER BY executed_at DESC LIMIT 5`, params).rows.map(r => ({ ...r, type: 'execution' }));
+    const recentPlans = query(`SELECT * FROM test_plans ${whereProject} ORDER BY updated_at DESC LIMIT 5`, params).rows.map(r => ({
+      ...r,
+      type: 'plan',
+      title: r.sequence ? `PT-${String(r.sequence).padStart(3, '0')} - ${r.title}` : r.title,
+    }));
+    const recentCases = query(`SELECT * FROM test_cases ${whereProject} ORDER BY updated_at DESC LIMIT 5`, params).rows.map(r => ({
+      ...r,
+      type: 'case',
+      title: r.sequence ? `CT-${String(r.sequence).padStart(3, '0')} - ${r.title}` : r.title,
+    }));
+    const recentExecs = query(`SELECT * FROM test_executions ${whereProject} ORDER BY executed_at DESC LIMIT 5`, params).rows.map(r => ({
+      ...r,
+      type: 'execution',
+      title: r.sequence ? `Execução EXE-${String(r.sequence).padStart(3, '0')}` : `Execução #${r.id.slice(0, 6)}`,
+      updated_at: r.executed_at,
+    }));
+    const recentDefects = query(`SELECT * FROM defects ${whereProject} ORDER BY updated_at DESC LIMIT 5`, params).rows.map(r => ({
+      ...r,
+      type: 'defect',
+      title: r.sequence ? `DEF-${String(r.sequence).padStart(3, '0')} - ${r.title}` : r.title,
+    }));
+    const recentReqs = query(`SELECT * FROM requirements ${whereProject} ORDER BY updated_at DESC LIMIT 5`, params).rows.map(r => ({
+      ...r,
+      type: 'requirement',
+      title: r.sequence ? `REQ-${String(r.sequence).padStart(3, '0')} - ${r.title}` : r.title,
+    }));
 
     res.json({
       overview,
       execStats,
       defectStats,
       planProgress,
-      recent: [...recentPlans, ...recentCases, ...recentExecs].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 10)
+      recent: [...recentPlans, ...recentCases, ...recentExecs, ...recentDefects, ...recentReqs]
+        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+        .slice(0, 10)
     });
   } catch (error) { next(error); }
 });

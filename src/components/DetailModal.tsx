@@ -1320,9 +1320,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
               )}
             </div>
             );
-          })()}
-
-          {type === 'execution' && 'actual_result' in item && (
+          })()}          {type === 'execution' && 'actual_result' in item && (
             <div className="space-y-4">
               {item.actual_result && (
                 <div>
@@ -1333,9 +1331,26 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
             </div>
           )}
 
+          {type === 'defect' && 'severity' in item && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 bg-muted/20 border border-border/40 rounded-xl p-3.5">
+                <div>
+                  <span className="text-xs text-muted-foreground block mb-0.5">Severidade</span>
+                  <span className={cn("px-2 py-0.5 rounded text-xs font-semibold inline-block", priorityBadgeClass(item.severity as any))}>
+                    {priorityLabel(item.severity as any)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground block mb-0.5">Status</span>
+                  <span className={cn("px-2 py-0.5 rounded text-xs font-semibold inline-block", defectStatusBadgeClass(item.status as any))}>
+                    {defectStatusLabel(item.status as any)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
-
-          {/* Vínculos para requisito — casos vinculados */}
+          {/* Vínculos para Requisito — casos vinculados */}
           {type === 'requirement' && linkedCases.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-2">Casos Vinculados</h3>
@@ -1355,9 +1370,10 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
           )}
 
           {/* Vínculos */}
-          {(type === 'case' || type === 'execution') &&
+          {(type === 'case' || type === 'execution' || type === 'defect') &&
             (('plan_id' in item && (item as any).plan_id) ||
-            (type === 'execution' && 'case_id' in item && (item as any).case_id) ||
+            ('case_id' in item && (item as any).case_id) ||
+            ('execution_id' in item && (item as any).execution_id) ||
             (type === 'case' && linkedReqs.length > 0)) && (
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-2">Vínculos</h3>
@@ -1393,7 +1409,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                     </div>
                   </div>
                 )}
-                {type === 'execution' && 'case_id' in item && (item as any).case_id && (
+                {'case_id' in item && (item as any).case_id && (
                   <div className="flex items-center gap-2 text-sm">
                     <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="font-medium text-foreground">Caso de Teste:</span>{' '}
@@ -1401,6 +1417,15 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                       {linkedCase
                         ? (linkedCase.sequence != null ? `CT-${String(linkedCase.sequence).padStart(3, '0')} — ${linkedCase.title || ''}` : linkedCase.title || (item as any).case_id)
                         : (item as any).case_id}
+                    </Link>
+                  </div>
+                )}
+                {'execution_id' in item && (item as any).execution_id && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <PlayCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-medium text-foreground">Execução Vinculada:</span>{' '}
+                    <Link to={`/executions?id=${(item as any).execution_id}`} className="text-brand hover:underline" onClick={handleClose}>
+                      EXE-{(item as any).execution_id.slice(0, 8)}
                     </Link>
                   </div>
                 )}

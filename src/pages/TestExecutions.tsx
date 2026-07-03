@@ -9,7 +9,7 @@ import { Plus, PlayCircle, Edit, Trash2, Search, ArrowUpDown, ListFilter, Downlo
 import { StatusDot } from '@/components/ui/StatusDot';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { useAuth } from '@/hooks/useAuth';
-import { getTestExecutionsByProject, getTestPlansByIds, getTestCasesByIds, deleteTestExecution, getDefects, createDefect } from '@/services/apiClientService';
+import { getTestExecutionsByProject, getTestPlansByIds, getTestCasesByIds, getTestCasesByProject, deleteTestExecution, getDefects, createDefect } from '@/services/apiClientService';
 import { apiClient } from '@/lib/api';
 import { TestExecution } from '@/types';
 import { TestExecutionForm } from '@/components/forms/TestExecutionForm';
@@ -77,7 +77,7 @@ export const TestExecutions = () => {
   const isProjectInactive = !!currentProject && currentProject.status !== 'active';
   // Mapas para enriquecer colunas (plano/caso)
   const [planMap, setPlanMap] = useState<Record<string, { id: string; sequence?: number; project_id: string }>>({});
-  const [caseMap, setCaseMap] = useState<Record<string, { id: string; sequence?: number }>>({});
+  const [caseMap, setCaseMap] = useState<Record<string, { id: string; sequence?: number; title?: string }>>({});
   // Defeitos por execução/caso
   const [defectsMap, setDefectsMap] = useState<Record<string, { count: number; defects: Array<{ id: string; title: string; status: string; severity?: string }> }>>({});
   // Exclusão
@@ -91,6 +91,17 @@ export const TestExecutions = () => {
   const [bugStakeholder, setBugStakeholder] = useState<string>('');
   const [projectUsers, setProjectUsers] = useState<Array<{ id: string; display_name: string | null; email: string }>>([]);  
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Estados adicionais para criação de bug geral
+  const [allProjectCases, setAllProjectCases] = useState<TestCase[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string>('');
+  const [caseExecutions, setCaseExecutions] = useState<TestExecution[]>([]);
+
+  const currentCaseExecutions = useMemo(() => {
+    if (!selectedCaseId) return [];
+    return executions.filter(e => e.case_id === selectedCaseId);
+  }, [selectedCaseId, executions]);
 
   // Tipagem e guarda para status
   const allowedStatuses = ['all', 'passed', 'failed', 'blocked', 'not_tested'] as const;
@@ -271,6 +282,16 @@ export const TestExecutions = () => {
         }
       }
       setExecutions(data);
+      
+      // Carregar todos os casos do projeto para o modal de bug geral
+      if (currentProject?.id) {
+        getTestCasesByProject(user!.id, currentProject.id)
+          .then(cases => setAllProjectCases(cases.sort((a, b) => (b.sequence || 0) - (a.sequence || 0))))
+          .catch(() => setAllProjectCases([]));
+      } else {
+        setAllProjectCases([]);
+      }
+
       // Enriquecer com mapas de plano e caso para exibição
       const uniquePlanIds = Array.from(new Set(data.map(e => e.plan_id).filter(Boolean)));
       const uniqueCaseIds = Array.from(new Set(data.map(e => e.case_id).filter(Boolean)));
@@ -281,8 +302,8 @@ export const TestExecutions = () => {
       const pMap: Record<string, { id: string; sequence?: number; project_id: string }> = {};
       plans.forEach(p => { pMap[p.id] = { id: p.id, sequence: p.sequence, project_id: p.project_id }; });
       setPlanMap(pMap);
-      const cMap: Record<string, { id: string; sequence?: number }> = {};
-      cases.forEach(c => { cMap[c.id] = { id: c.id, sequence: c.sequence }; });
+      const cMap: Record<string, { id: string; sequence?: number; title?: string }> = {};
+      cases.forEach(c => { cMap[c.id] = { id: c.id, sequence: c.sequence, title: c.title }; });
       setCaseMap(cMap);
 
       // Carregar defeitos por caso para mostrar contador de bugs
@@ -346,6 +367,10 @@ export const TestExecutions = () => {
     const c = caseMap[caseId];
     if (!c) return '—';
     return c.sequence != null ? `CT-${String(c.sequence).padStart(3, '0')}` : `CT-${c.id.slice(0, 4)}`;
+  };
+  const caseTitle = (caseId: string) => {
+    const c = caseMap[caseId];
+    return c?.title || '';
   };
   const planLabel = (planId: string) => {
     const p = planMap[planId];
@@ -487,6 +512,26 @@ export const TestExecutions = () => {
         </div>
         {/* Nova Execução */}
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive rounded-md"
+            title="Reportar Defeito Geral"
+            disabled={!currentProject || isProjectInactive}
+            onClick={() => {
+              setExecutionToReport(null);
+              setBugTitle('');
+              setBugDescription('');
+              setBugSeverity('medium');
+              setBugStakeholder('');
+              setSelectedCaseId('');
+              setSelectedExecutionId('');
+              setCaseExecutions([]);
+              setShowReportBugModal(true);
+            }}
+          >
+            <BugIcon className="h-4 w-4" />
+          </Button>
           <Button
               variant="outline"
               size="icon"
@@ -670,13 +715,18 @@ export const TestExecutions = () => {
                 >
                   <CardHeader className="p-4 pb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 min-w-0">
+                      <div className="flex items-start gap-2 min-w-0 w-full">
                         <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
                           {exeLabel(execution)}
                         </span>
-                        <span className="text-sm font-semibold truncate">
-                          {caseLabel(execution.case_id)} • {planLabel(execution.plan_id)}
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs text-muted-foreground block truncate">
+                            {caseLabel(execution.case_id)} • {planLabel(execution.plan_id)}
+                          </span>
+                          <span className="text-sm font-bold text-foreground block truncate mt-1" title={caseTitle(execution.case_id)}>
+                            {caseTitle(execution.case_id) || 'Caso sem título'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="mt-1.5">
@@ -728,7 +778,7 @@ export const TestExecutions = () => {
                   <div>Caso</div>
                   <div>Plano</div>
                   <div>Status</div>
-                  <div>Descrição</div>
+                  <div>Caso / Descrição</div>
                   <div className="text-center">Exec.</div>
                   <div>Executado em</div>
                   <div className="text-center">Report</div>
@@ -768,14 +818,17 @@ export const TestExecutions = () => {
                         <StatusDot status={execution.status} label={executionStatusLabel(execution.status as any)} />
                       </div>
 
-                      {/* Descrição */}
+                      {/* Caso / Descrição */}
                       <div className="min-w-0">
+                        <span className="text-xs font-semibold text-foreground block truncate" title={caseTitle(execution.case_id)}>
+                          {caseTitle(execution.case_id) || 'Caso sem título'}
+                        </span>
                         {(execution.notes || execution.actual_result) ? (
-                          <span className="text-xs text-muted-foreground truncate block">
+                          <span className="text-[10px] text-muted-foreground truncate block mt-0.5">
                             {execution.notes || execution.actual_result}
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground/40">—</span>
+                          <span className="text-[10px] text-muted-foreground/40 block mt-0.5">— sem notas —</span>
                         )}
                       </div>
 
@@ -967,47 +1020,99 @@ export const TestExecutions = () => {
         }
         if (!open) {
           setBugStakeholder('');
+          setSelectedCaseId('');
+          setSelectedExecutionId('');
         }
       }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <BugIcon className="h-5 w-5 text-destructive" />
-              Reportar Defeito
+              Reportar Defeito (Bug)
             </DialogTitle>
             <DialogDescription>
-              Criar um novo defeito vinculado ao caso de teste {executionToReport ? caseLabel(executionToReport.case_id) : ''}.
+              {executionToReport ? (
+                <span>
+                  Criar um defeito vinculado ao caso <strong className="text-foreground">{caseLabel(executionToReport.case_id)} - {caseTitle(executionToReport.case_id)}</strong>.
+                </span>
+              ) : (
+                <span>Criar um defeito geral para este projeto. Opcionalmente, vincule-o a um caso e execução abaixo.</span>
+              )}
               <br />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground mt-1 block">
                 Este defeito será automaticamente vinculado na Matriz de Rastreabilidade.
               </span>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Título do Defeito</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Título do Defeito</label>
               <Input
                 value={bugTitle}
                 onChange={(e) => setBugTitle(e.target.value)}
-                placeholder="Descreva o defeito encontrado"
+                placeholder="Ex: Falha na validação do formulário de login"
+                className="focus:ring-2 focus:ring-destructive focus:border-transparent transition-all"
               />
             </div>
+            
             <div className="space-y-2">
-              <label className="text-sm font-medium">Descrição</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Descrição</label>
               <textarea
                 value={bugDescription}
                 onChange={(e) => setBugDescription(e.target.value)}
-                placeholder="Detalhes do problema, passos para reproduzir, resultado esperado..."
-                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="Descreva detalhadamente o problema, passos para reproduzir, comportamento esperado..."
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-destructive focus:border-transparent outline-none transition-all"
               />
             </div>
+
+            {/* Seletores manuais quando o bug é geral */}
+            {!executionToReport && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Caso Relacionado</label>
+                  <select
+                    value={selectedCaseId}
+                    onChange={(e) => {
+                      setSelectedCaseId(e.target.value);
+                      setSelectedExecutionId('');
+                    }}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-destructive focus:border-transparent outline-none transition-all"
+                  >
+                    <option value="">Nenhum</option>
+                    {allProjectCases.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.sequence != null ? `CT-${String(c.sequence).padStart(3, '0')}` : ''} - {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Execução Vinculada</label>
+                  <select
+                    value={selectedExecutionId}
+                    onChange={(e) => setSelectedExecutionId(e.target.value)}
+                    disabled={!selectedCaseId}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-destructive focus:border-transparent outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Nenhuma</option>
+                    {currentCaseExecutions.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {exeLabel(e)} ({new Date(e.executed_at).toLocaleDateString('pt-BR')}) - {executionStatusLabel(e.status as any)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Interessado</label>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Interessado</label>
               <select
                 value={bugStakeholder}
                 onChange={(e) => setBugStakeholder(e.target.value)}
                 disabled={loadingUsers}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-destructive focus:border-transparent outline-none transition-all"
               >
                 <option value="">Selecionar interessado (opcional)</option>
                 {projectUsers
@@ -1019,35 +1124,61 @@ export const TestExecutions = () => {
                   ))}
               </select>
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Severidade</label>
-              <div className="flex gap-2">
-                {(['low', 'medium', 'high', 'critical'] as const).map((sev) => (
-                  <button
-                    key={sev}
-                    onClick={() => setBugSeverity(sev)}
-                    className={`px-3 py-1.5 text-xs rounded-md border ${
-                      bugSeverity === sev
-                        ? 'bg-destructive text-destructive-foreground border-destructive'
-                        : 'bg-background text-foreground border-input hover:bg-muted'
-                    }`}
-                  >
-                    {sev === 'low' && 'Baixa'}
-                    {sev === 'medium' && 'Média'}
-                    {sev === 'high' && 'Alta'}
-                    {sev === 'critical' && 'Crítica'}
-                  </button>
-                ))}
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Severidade</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(['low', 'medium', 'high', 'critical'] as const).map((sev) => {
+                  const isSelected = bugSeverity === sev;
+                  let colorClass = '';
+                  if (sev === 'low') {
+                    colorClass = isSelected 
+                      ? 'bg-emerald-500 text-white border-emerald-600 dark:bg-emerald-600' 
+                      : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20 dark:text-emerald-400';
+                  } else if (sev === 'medium') {
+                    colorClass = isSelected 
+                      ? 'bg-amber-500 text-white border-amber-600 dark:bg-amber-600' 
+                      : 'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20 dark:text-amber-400';
+                  } else if (sev === 'high') {
+                    colorClass = isSelected 
+                      ? 'bg-orange-500 text-white border-orange-600 dark:bg-orange-600' 
+                      : 'bg-orange-500/10 text-orange-600 border-orange-500/20 hover:bg-orange-500/20 dark:text-orange-400';
+                  } else if (sev === 'critical') {
+                    colorClass = isSelected 
+                      ? 'bg-red-500 text-white border-red-600 dark:bg-red-600' 
+                      : 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20 dark:text-red-400';
+                  }
+                  
+                  return (
+                    <button
+                      key={sev}
+                      type="button"
+                      onClick={() => setBugSeverity(sev)}
+                      className={cn("py-2 text-xs font-semibold rounded-md border text-center transition-all duration-200 cursor-pointer active:scale-95", colorClass)}
+                    >
+                      {sev === 'low' && 'Baixa'}
+                      {sev === 'medium' && 'Média'}
+                      {sev === 'high' && 'Alta'}
+                      {sev === 'critical' && 'Crítica'}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <Button variant="outline" onClick={() => setShowReportBugModal(false)}>
               Cancelar
             </Button>
             <Button
               onClick={async () => {
-                if (!executionToReport || !user || !bugTitle.trim()) return;
+                if (!user || !bugTitle.trim()) return;
+                const finalPlanId = executionToReport 
+                  ? executionToReport.plan_id 
+                  : (selectedCaseId ? allProjectCases.find(c => c.id === selectedCaseId)?.plan_id : null);
+                const finalCaseId = executionToReport ? executionToReport.case_id : (selectedCaseId || null);
+                const finalExecutionId = executionToReport ? executionToReport.id : (selectedExecutionId || null);
+
                 try {
                   await createDefect({
                     title: bugTitle.trim(),
@@ -1055,31 +1186,34 @@ export const TestExecutions = () => {
                     severity: bugSeverity,
                     status: 'open',
                     project_id: currentProject?.id || '',
-                    plan_id: executionToReport.plan_id,
-                    case_id: executionToReport.case_id,
-                    execution_id: executionToReport.id,
+                    plan_id: finalPlanId || undefined,
+                    case_id: finalCaseId || undefined,
+                    execution_id: finalExecutionId || undefined,
                     user_id: user.id,
                   });
                   if (bugStakeholder) {
                     const reporterName = user.user_metadata?.full_name || user.email || 'Alguém';
+                    const linkLabel = finalCaseId ? ` ao caso ${caseLabel(finalCaseId)}` : '';
                     await apiClient.from('notifications' as any).insert({
                       id: crypto.randomUUID(),
                       user_id: bugStakeholder,
                       title: 'Novo defeito reportado',
-                      body: `${reporterName} reportou um defeito: "${bugTitle.trim()}" (${bugSeverity === 'critical' ? 'Crítica' : bugSeverity === 'high' ? 'Alta' : bugSeverity === 'medium' ? 'Média' : 'Baixa'}) vinculado ao caso ${caseLabel(executionToReport.case_id)}.`,
+                      body: `${reporterName} reportou um defeito: "${bugTitle.trim()}" (${bugSeverity === 'critical' ? 'Crítica' : bugSeverity === 'high' ? 'Alta' : bugSeverity === 'medium' ? 'Média' : 'Baixa'})${linkLabel}.`,
                     });
                   }
                   toast({
                     title: 'Defeito criado',
                     description: bugStakeholder
                       ? 'Defeito reportado e notificação enviada ao interessado.'
-                      : 'O defeito foi reportado com sucesso e vinculado ao caso de teste.',
+                      : 'O defeito foi reportado com sucesso.',
                   });
                   setShowReportBugModal(false);
                   setBugTitle('');
                   setBugDescription('');
                   setBugSeverity('medium');
                   setBugStakeholder('');
+                  setSelectedCaseId('');
+                  setSelectedExecutionId('');
                   loadExecutions();
                 } catch (error: any) {
                   toast({
@@ -1089,7 +1223,7 @@ export const TestExecutions = () => {
                   });
                 }
               }}
-              disabled={!bugTitle.trim() || !executionToReport}
+              disabled={!bugTitle.trim()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Reportar Defeito
