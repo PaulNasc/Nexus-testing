@@ -115,7 +115,11 @@ export const TestRuns = () => {
         getTestPlans(undefined as any, currentProject.id).catch(() => [] as TestPlan[]),
       ]);
       setRuns(runsData);
-      setPlans(plansData);
+      const sortedPlans = [...plansData].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setPlans(sortedPlans);
       const entries = await Promise.all(
         runsData.map(async (r) => {
           try {

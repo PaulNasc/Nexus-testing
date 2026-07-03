@@ -92,7 +92,11 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
   const loadPlans = async () => {
     try {
       const data = await getTestPlans(user!.id, currentProject?.id);
-      setPlans(data);
+      const sorted = [...data].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setPlans(sorted);
     } catch (error) {
       console.error('Erro ao carregar planos:', error);
     }
@@ -102,7 +106,12 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
     if (!currentProject?.id) { setRuns([]); return; }
     try {
       const data = await listTestRunsByProject(currentProject.id);
-      setRuns(data.filter(r => r.status === 'planned' || r.status === 'in_progress'));
+      const filtered = data.filter(r => r.status === 'planned' || r.status === 'in_progress');
+      const sorted = [...filtered].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setRuns(sorted);
     } catch { setRuns([]); }
   };
 
@@ -199,7 +208,11 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
   const loadCases = async (planId: string) => {
     try {
       const data = await getTestCases(user!.id, planId);
-      setCases(data);
+      const sorted = [...data].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setCases(sorted);
     } catch (error) {
       console.error('Erro ao carregar casos:', error);
     }

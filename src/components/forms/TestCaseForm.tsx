@@ -174,7 +174,11 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
       const data = selectedProjectId
         ? await getTestPlansByProject(user!.id, selectedProjectId)
         : [];
-      setPlans(data);
+      const sorted = [...data].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setPlans(sorted);
     } catch (error) {
       console.error('Erro ao carregar planos:', error);
     }
@@ -185,7 +189,11 @@ export const TestCaseForm = ({ onSuccess, onCancel, planId, initialData }: TestC
       const data = selectedProjectId
         ? await getRequirementsByProject(user!.id, selectedProjectId)
         : [];
-      setRequirements(data);
+      const sorted = [...data].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setRequirements(sorted);
     } catch (error) {
       console.error('Erro ao carregar requisitos:', error);
     }

@@ -145,7 +145,11 @@ export const TestExecutionForm = ({ onSuccess, onCancel, caseId, planId, executi
   const loadPlans = async () => {
     try {
       const data = selectedProjectId ? await getTestPlans(user!.id, selectedProjectId) : [];
-      setPlans(data);
+      const sorted = [...data].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setPlans(sorted);
     } catch (error) {
       console.error('Erro ao carregar planos:', error);
     }
@@ -154,7 +158,11 @@ export const TestExecutionForm = ({ onSuccess, onCancel, caseId, planId, executi
   const loadCases = async (selectedPlanId: string) => {
     try {
       const data = await getTestCases(user!.id, selectedPlanId);
-      setCases(data);
+      const sorted = [...data].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setCases(sorted);
     } catch (error) {
       console.error('Erro ao carregar casos:', error);
     }
@@ -165,7 +173,12 @@ export const TestExecutionForm = ({ onSuccess, onCancel, caseId, planId, executi
     try {
       const data = await listTestRunsByProject(selectedProjectId);
       // Apenas ciclos ativos/planejados sao opcoes uteis para nova execucao
-      setRuns(data.filter(r => r.status === 'planned' || r.status === 'in_progress'));
+      const filtered = data.filter(r => r.status === 'planned' || r.status === 'in_progress');
+      const sorted = [...filtered].sort((a: any, b: any) => 
+        (b.sequence || 0) - (a.sequence || 0) || 
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+      setRuns(sorted);
     } catch { setRuns([]); }
   };
 
