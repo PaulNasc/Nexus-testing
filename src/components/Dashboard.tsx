@@ -90,16 +90,16 @@ const StatCard = ({
   onClick?: () => void;
 }) => (
   <div
-    className={`border border-border/70 rounded-lg p-4 bg-card/80 hover:bg-card hover:border-border transition-all shadow-xs flex items-start gap-3.5 group ${onClick ? 'cursor-pointer' : ''}`}
+    className={`border border-border/70 rounded-lg p-2.5 sm:p-3 bg-card/80 hover:bg-card hover:border-border transition-all shadow-xs flex items-center gap-2.5 sm:gap-3 group min-w-0 ${onClick ? 'cursor-pointer' : ''}`}
     onClick={onClick}
   >
-    <div className={`h-10 w-10 rounded-md flex items-center justify-center shrink-0 border border-border/40 ${iconBg} transition-transform group-hover:scale-105`}>
-      <Icon className={`h-5 w-5 ${iconColor}`} />
+    <div className={`h-8.5 w-8.5 sm:h-9 sm:w-9 rounded-md flex items-center justify-center shrink-0 border border-border/40 ${iconBg} transition-transform group-hover:scale-105`}>
+      <Icon className={`h-4 w-4 sm:h-4.5 sm:w-4.5 ${iconColor}`} />
     </div>
-    <div className="min-w-0">
-      <div className="text-2xl font-bold tracking-tight text-foreground">{value}</div>
-      <div className="text-xs text-muted-foreground font-medium mt-0.5 leading-tight">{label}</div>
-      {sub && <div className="text-[10px] text-muted-foreground/70 mt-0.5">{sub}</div>}
+    <div className="min-w-0 flex-1">
+      <div className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-none">{value}</div>
+      <div className="text-[11px] sm:text-xs text-muted-foreground font-medium mt-1 leading-tight truncate">{label}</div>
+      {sub && <div className="text-[9px] sm:text-[10px] text-muted-foreground/70 mt-0.5 truncate">{sub}</div>}
     </div>
   </div>
 );
@@ -402,11 +402,11 @@ export const Dashboard = () => {
   const emptySlotsCount = Math.max(0, TARGET_PLAN_ROWS - displayedPlans.length);
 
   return (
-    <div className="space-y-5 px-3 sm:px-5 lg:px-6 xl:px-8 2xl:px-16 pt-1">
+    <div className="space-y-4 sm:space-y-5 max-w-full pb-4">
       {/* ── Header do Dashboard (Limpo & Sem Redundâncias) ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap pb-1.5 border-b border-border/30">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Visão Geral</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Visão Geral</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Monitoramento de qualidade, cobertura de requisitos e execução de testes.
           </p>
@@ -414,14 +414,14 @@ export const Dashboard = () => {
       </div>
 
       {/* ── Visão Geral — 6 KPI StatCards ── */}
-      <section className="space-y-2.5">
+      <section className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-brand" /> Métricas Globais
           </p>
           <span className="text-[11px] text-muted-foreground/80">Sincronizado automaticamente</span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-2.5">
           <StatCard label="Planos de Teste" value={overview.totalPlans} icon={FileText} iconBg="bg-purple-500/15" iconColor="text-purple-400" onClick={() => navigate('/plans')} />
           <StatCard label="Casos de Teste" value={overview.totalCases} icon={TestTube} iconBg="bg-teal-500/15" iconColor="text-teal-400" onClick={() => navigate('/cases')} />
           <StatCard label="Execuções" value={overview.totalExecutions} icon={PlayCircle} iconBg="bg-emerald-500/15" iconColor="text-emerald-400" onClick={() => navigate('/executions')} />
@@ -432,7 +432,7 @@ export const Dashboard = () => {
       </section>
 
       {/* ── Painel de Performance & Qualidade (3 Colunas Balanceadas) ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-3.5">
         {/* Coluna 1: Resultado das Execuções */}
         <div className="border border-border/70 rounded-lg p-4 bg-card/80 space-y-3.5 shadow-xs flex flex-col justify-between">
           <div>
@@ -555,7 +555,7 @@ export const Dashboard = () => {
       </div>
 
       {/* ── Progresso de Planos + Atividade Recente (Mesma Altura Balanceada) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 sm:gap-3.5">
         {/* Progresso por Plano */}
         <div className="lg:col-span-3 border border-border/70 rounded-lg p-4 bg-card/80 h-[340px] flex flex-col justify-between shadow-xs">
           <div>

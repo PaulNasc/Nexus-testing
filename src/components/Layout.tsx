@@ -66,10 +66,7 @@ export const Layout = ({ children }: LayoutProps) => {
           )}
         >
           <Header />
-          <main className={cn(
-            "flex-1 overflow-x-hidden px-3 sm:px-5 lg:px-6 xl:px-8 py-4 sm:py-5",
-            (location.pathname === '/' || location.pathname.startsWith('/history')) ? 'overflow-hidden' : 'overflow-y-auto'
-          )}>
+          <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4">
             <Outlet />
             {children}
           </main>

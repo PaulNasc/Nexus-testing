@@ -33,6 +33,7 @@ import { NotificationModal, type NotificationItem } from '@/components/Notificat
 import { useNotificationSSE } from '@/hooks/useNotificationSSE';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 const ROLE_INFO: Record<string, { name: string; color: string; badge: string }> = {
   master:  { name: 'Master',         color: 'text-purple-400', badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
@@ -320,9 +321,12 @@ export const Header = () => {
                   variant="outline" 
                   className="h-9 px-2 sm:px-2.5 gap-2 rounded-md border-border/70 bg-muted/20 hover:bg-muted/40 hover:border-border transition-all shadow-xs"
                 >
-                  <div className="w-6 h-6 rounded-md bg-brand/10 border border-brand/20 text-brand flex items-center justify-center text-xs font-bold shrink-0">
-                    {(user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-                  </div>
+                  <UserAvatar 
+                    userId={user?.id} 
+                    name={user?.user_metadata?.full_name || user?.email} 
+                    size="sm" 
+                    className="h-6 w-6 rounded-md border border-border/60" 
+                  />
                   <div className="hidden lg:flex flex-col text-left">
                     <span className="text-xs font-semibold text-foreground leading-tight truncate max-w-[100px]">
                       {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'}
