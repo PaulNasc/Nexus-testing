@@ -138,7 +138,7 @@ export function ProjectPicker() {
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0 ml-0.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0">
+        <PopoverContent className="w-[300px] p-0 bg-card border border-border/80 shadow-md">
           <div className="px-3 py-2 text-xs text-muted-foreground">Selecionar projeto</div>
           <Command>
             <CommandInput placeholder="Buscar projeto..." value={query} onValueChange={setQuery} />

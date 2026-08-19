@@ -142,18 +142,18 @@ export const Sidebar = () => {
                   to={item.href}
                   onClick={() => setIsOpen(false)}
                   className={cn(
-                    "flex items-center py-2 text-xs font-semibold rounded-md transition-all group",
+                    "flex items-center py-2 text-xs font-semibold rounded-md transition-all duration-200 group relative",
                     isExpanded ? "px-2.5 justify-start" : "px-2 justify-center",
                     isActive
-                      ? "bg-brand/12 text-brand border border-brand/25 shadow-2xs"
-                      : "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
+                      ? "bg-brand text-white font-bold shadow-xs border border-brand/40"
+                      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
                   )}
                   title={!isExpanded ? item.name : undefined}
                 >
                   <Icon className={cn(
-                    "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
+                    "h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110",
                     isExpanded ? "mr-2.5" : "",
-                    isActive ? "text-brand" : item.color
+                    isActive ? "text-white" : item.color
                   )} />
                   {isExpanded && (
                     <span className="truncate flex-1">{item.name}</span>
@@ -177,18 +177,18 @@ export const Sidebar = () => {
                     }
                   }}
                   className={cn(
-                    "w-full flex items-center py-2 text-xs font-semibold rounded-md transition-all group",
+                    "w-full flex items-center py-2 text-xs font-semibold rounded-md transition-all duration-200 group",
                     isExpanded ? "px-2.5 justify-between" : "px-2 justify-center",
-                    "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
+                    "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
                   )}
                   title={!isExpanded ? 'Administrativo' : undefined}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <ShieldCheck className="h-4 w-4 text-rose-400 shrink-0 group-hover:scale-110 transition-transform" />
+                    <ShieldCheck className="h-4 w-4 text-rose-400 shrink-0 group-hover:scale-110 transition-transform duration-200" />
                     {isExpanded && <span className="truncate">Administrativo</span>}
                   </div>
                   {isExpanded && (
-                    <ChevronRight className={cn("h-3.5 w-3.5 transition-transform shrink-0 opacity-70", adminOpen ? "rotate-90" : "rotate-0")} />
+                    <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200 shrink-0 opacity-70", adminOpen ? "rotate-90" : "rotate-0")} />
                   )}
                 </button>
 
@@ -203,13 +203,13 @@ export const Sidebar = () => {
                           to={item.href}
                           onClick={() => setIsOpen(false)}
                           className={cn(
-                            "flex items-center py-1.5 px-2 text-xs font-semibold rounded-md transition-all group",
+                            "flex items-center py-1.5 px-2 text-xs font-semibold rounded-md transition-all duration-200 group",
                             isActive
-                              ? "bg-brand/12 text-brand border border-brand/25 shadow-2xs"
-                              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
+                              ? "bg-brand text-white font-bold shadow-xs border border-brand/40"
+                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border border-transparent"
                           )}
                         >
-                          <Icon className={cn("h-3.5 w-3.5 mr-2 shrink-0 transition-transform group-hover:scale-110", isActive ? "text-brand" : item.color)} />
+                          <Icon className={cn("h-3.5 w-3.5 mr-2 shrink-0 transition-transform duration-200 group-hover:scale-110", isActive ? "text-white" : item.color)} />
                           <span className="truncate">{item.name}</span>
                         </Link>
                       );
