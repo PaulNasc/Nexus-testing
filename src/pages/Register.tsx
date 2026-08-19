@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import KrigzisLogo from '@/components/branding/KrigzisLogo';
+import { NexusIcon } from '@/components/branding/NexusLogo';
 import { Eye, EyeOff, ArrowRight, User, Mail, Lock } from 'lucide-react';
 
 export default function Register() {
@@ -40,18 +40,20 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
       {/* Subtle background pattern */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--brand)/0.08),transparent)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--brand)/0.12),transparent)]" />
 
-      <div className="relative w-full max-w-sm mx-4">
+      <div className="relative w-full max-w-sm">
         {/* Logo + Title */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2.5 mb-3">
-            <KrigzisLogo size={28} className="h-7 w-7" />
-            <span className="text-xl font-semibold tracking-tight text-foreground">Nexus Testing</span>
+        <div className="text-center mb-6">
+          <div className="flex flex-col items-center justify-center mb-2">
+            <div className="h-14 w-14 rounded-2xl bg-brand/10 border border-brand/25 flex items-center justify-center mb-3 shadow-lg shadow-brand/10">
+              <NexusIcon size={34} />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Nexus Testing</h1>
+            <p className="text-xs text-muted-foreground mt-1">Crie sua conta para começar</p>
           </div>
-          <p className="text-sm text-muted-foreground">Crie sua conta para começar</p>
         </div>
 
         {/* Form Card */}

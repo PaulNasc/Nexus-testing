@@ -1,42 +1,43 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  ClipboardList,
-  FlaskConical,
-  Play,
-  Repeat,
-  Kanban,
-  Bot,
-  TrendingUp,
   ShieldCheck,
-  FolderKanban,
-  Users,
-  Cpu,
   Menu,
   X,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import KrigzisLogo from '@/components/branding/KrigzisLogo';
+import { NexusIcon } from '@/components/branding/NexusLogo';
+import {
+  NexusDashboardIcon,
+  NexusTestPlanIcon,
+  NexusTestCaseIcon,
+  NexusExecutionIcon,
+  NexusCyclesIcon,
+  NexusManagementIcon,
+  NexusReportsIcon,
+  NexusProjectsAdminIcon,
+  NexusUsersIcon,
+  NexusAIIcon,
+} from '@/components/icons/NexusIcons';
 import { cn } from '@/lib/utils';
 import { usePermissions } from '@/hooks/usePermissions';
 
 const navigation = [
-  { name: 'Dashboard',      href: '/',             icon: LayoutDashboard, color: 'text-blue-400',    requiredPermission: null },
-  { name: 'Planos de Teste', href: '/plans',        icon: ClipboardList,   color: 'text-purple-400', requiredPermission: 'can_manage_plans' },
-  { name: 'Casos de Teste',  href: '/cases',        icon: FlaskConical,    color: 'text-teal-400',   requiredPermission: 'can_manage_cases' },
-  { name: 'Execuções',       href: '/executions',   icon: Play,            color: 'text-green-400',  requiredPermission: 'can_manage_executions' },
-  { name: 'Ciclos',          href: '/runs',         icon: Repeat,          color: 'text-amber-400',  requiredPermission: 'can_manage_executions' },
-  { name: 'Gestão',          href: '/management',   icon: Kanban,          color: 'text-orange-400', requiredPermission: null },
-  { name: 'Relatórios',      href: '/reports',      icon: TrendingUp,      color: 'text-pink-400',   requiredPermission: 'can_view_reports' },
+  { name: 'Dashboard',      href: '/',             icon: NexusDashboardIcon,    color: 'text-blue-400',    requiredPermission: null },
+  { name: 'Planos de Teste', href: '/plans',        icon: NexusTestPlanIcon,     color: 'text-purple-400',  requiredPermission: 'can_manage_plans' },
+  { name: 'Casos de Teste',  href: '/cases',        icon: NexusTestCaseIcon,     color: 'text-teal-400',    requiredPermission: 'can_manage_cases' },
+  { name: 'Execuções',       href: '/executions',   icon: NexusExecutionIcon,    color: 'text-green-400',   requiredPermission: 'can_manage_executions' },
+  { name: 'Ciclos',          href: '/runs',         icon: NexusCyclesIcon,       color: 'text-amber-400',   requiredPermission: 'can_manage_executions' },
+  { name: 'Gestão',          href: '/management',   icon: NexusManagementIcon,   color: 'text-orange-400',  requiredPermission: null },
+  { name: 'Relatórios',      href: '/reports',      icon: NexusReportsIcon,      color: 'text-pink-400',    requiredPermission: 'can_view_reports' },
 ];
 
 // Itens administrativos (sub-menu colapsável)
 const adminNavigation = [
-  { name: 'Projetos',  href: '/project-admin',   icon: FolderKanban, color: 'text-violet-400',  requiredPermission: 'can_manage_projects' },
-  { name: 'Usuários',  href: '/user-management', icon: Users,        color: 'text-emerald-400', requiredPermission: 'can_manage_users' },
-  { name: 'Config. IA', href: '/model-control',   icon: Cpu,          color: 'text-cyan-400',    requiredPermission: 'can_access_model_control' },
+  { name: 'Projetos',  href: '/project-admin',   icon: NexusProjectsAdminIcon, color: 'text-violet-400',  requiredPermission: 'can_manage_projects' },
+  { name: 'Usuários',  href: '/user-management', icon: NexusUsersIcon,         color: 'text-emerald-400', requiredPermission: 'can_manage_users' },
+  { name: 'Config. IA', href: '/model-control',   icon: NexusAIIcon,            color: 'text-cyan-400',    requiredPermission: 'can_access_model_control' },
 ];
 
 export const Sidebar = () => {
@@ -98,7 +99,7 @@ export const Sidebar = () => {
               <>
                 <Link to="/" className="flex items-center gap-2.5 min-w-0 group">
                   <div className="h-8 w-8 rounded-md bg-brand/10 border border-brand/25 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
-                    <KrigzisLogo size={18} className="h-4.5 w-4.5 text-brand" />
+                    <NexusIcon size={20} className="h-5 w-5 text-brand" />
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className="font-bold text-sm text-foreground tracking-tight truncate leading-tight group-hover:text-brand transition-colors">
@@ -123,7 +124,7 @@ export const Sidebar = () => {
                 className="h-9 w-9 rounded-md bg-brand/10 hover:bg-brand/20 border border-brand/25 flex items-center justify-center text-brand transition-all shadow-2xs group"
                 title="Expandir menu lateral"
               >
-                <KrigzisLogo size={20} className="h-5 w-5 group-hover:scale-105 transition-transform" />
+                <NexusIcon size={22} className="h-5.5 w-5.5 group-hover:scale-105 transition-transform" />
               </button>
             )}
           </div>
