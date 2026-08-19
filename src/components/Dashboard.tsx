@@ -6,7 +6,7 @@ import {
   FileText, TestTube, PlayCircle, Bug, Plus, Sparkles,
   ClipboardCheck, Link2, BarChart3, Download, Loader2,
   TrendingUp, CheckCircle, XCircle, MinusCircle, Clock,
-  ChevronRight, Rocket, FolderPlus
+  ChevronRight, Rocket, FolderPlus, RefreshCw, ShieldCheck, Activity, Layers
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { createProject, generateSlug, checkSlugExists } from '@/services/projectService';
 import { toast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,16 +90,16 @@ const StatCard = ({
   onClick?: () => void;
 }) => (
   <div
-    className={`border border-border rounded-lg p-4 bg-card flex items-start gap-3 ${onClick ? 'cursor-pointer hover:bg-muted/30 transition-colors' : ''}`}
+    className={`border border-border/70 rounded-lg p-4 bg-card/80 hover:bg-card hover:border-border transition-all shadow-xs flex items-start gap-3.5 group ${onClick ? 'cursor-pointer' : ''}`}
     onClick={onClick}
   >
-    <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
-      <Icon className={`h-[18px] w-[18px] ${iconColor}`} />
+    <div className={`h-10 w-10 rounded-md flex items-center justify-center shrink-0 border border-border/40 ${iconBg} transition-transform group-hover:scale-105`}>
+      <Icon className={`h-5 w-5 ${iconColor}`} />
     </div>
     <div className="min-w-0">
-      <div className="text-2xl font-bold tracking-tight">{value}</div>
-      <div className="text-xs text-muted-foreground leading-tight">{label}</div>
-      {sub && <div className="text-[11px] text-muted-foreground/70 mt-0.5">{sub}</div>}
+      <div className="text-2xl font-bold tracking-tight text-foreground">{value}</div>
+      <div className="text-xs text-muted-foreground font-medium mt-0.5 leading-tight">{label}</div>
+      {sub && <div className="text-[10px] text-muted-foreground/70 mt-0.5">{sub}</div>}
     </div>
   </div>
 );
@@ -396,191 +397,257 @@ export const Dashboard = () => {
     );
   }
 
-  return (
-    <div className="space-y-5 px-3 sm:px-5 lg:px-6 xl:px-8 2xl:px-16">
+  const TARGET_PLAN_ROWS = 4;
+  const displayedPlans = progressRows.slice(0, TARGET_PLAN_ROWS);
+  const emptySlotsCount = Math.max(0, TARGET_PLAN_ROWS - displayedPlans.length);
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+  return (
+    <div className="space-y-5 px-3 sm:px-5 lg:px-6 xl:px-8 2xl:px-16 pt-1">
+      {/* ── Header do Dashboard (Limpo & Sem Redundâncias) ── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap pb-1.5 border-b border-border/30">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Bem-vindo, {welcomeName}!</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {currentProject ? currentProject.name : 'Todos os projetos ativos'} — visão geral
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Visão Geral</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Monitoramento de qualidade, cobertura de requisitos e execução de testes.
           </p>
         </div>
-        <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogTrigger asChild>
-            <StandardButton
-              icon={Plus}
-              variant="brand"
-              disabled={!currentProject || currentProject.status !== 'active'}
-              title={!currentProject ? 'Selecione um projeto ativo' : currentProject.status !== 'active' ? 'Projeto não ativo' : undefined}
-            >
-              {quickAction.label}
-            </StandardButton>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <FormComponent onSuccess={() => { load(); setShowForm(false); }} onCancel={() => setShowForm(false)} />
-          </DialogContent>
-        </Dialog>
       </div>
 
-      {/* ── Visão Geral — 6 cards ── */}
-      <section>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Visão Geral</p>
+      {/* ── Visão Geral — 6 KPI StatCards ── */}
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <Activity className="h-3.5 w-3.5 text-brand" /> Métricas Globais
+          </p>
+          <span className="text-[11px] text-muted-foreground/80">Sincronizado automaticamente</span>
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-          <StatCard label="Planos" value={overview.totalPlans} icon={FileText} iconBg="bg-brand/15" iconColor="text-brand" onClick={() => navigate('/plans')} />
-          <StatCard label="Casos" value={overview.totalCases} icon={TestTube} iconBg="bg-info/15" iconColor="text-info" onClick={() => navigate('/cases')} />
-          <StatCard label="Execuções" value={overview.totalExecutions} icon={PlayCircle} iconBg="bg-success/15" iconColor="text-success" onClick={() => navigate('/executions')} />
-          <StatCard label="Requisitos" value={overview.totalRequirements} icon={Link2} iconBg="bg-purple-500/15" iconColor="text-purple-400" onClick={() => navigate('/management?tab=requirements')} />
-          <StatCard label="Defeitos abertos" value={overview.totalDefects} icon={Bug} iconBg="bg-destructive/15" iconColor="text-destructive" onClick={() => navigate('/management?tab=defects')} />
+          <StatCard label="Planos de Teste" value={overview.totalPlans} icon={FileText} iconBg="bg-purple-500/15" iconColor="text-purple-400" onClick={() => navigate('/plans')} />
+          <StatCard label="Casos de Teste" value={overview.totalCases} icon={TestTube} iconBg="bg-teal-500/15" iconColor="text-teal-400" onClick={() => navigate('/cases')} />
+          <StatCard label="Execuções" value={overview.totalExecutions} icon={PlayCircle} iconBg="bg-emerald-500/15" iconColor="text-emerald-400" onClick={() => navigate('/executions')} />
+          <StatCard label="Requisitos" value={overview.totalRequirements} icon={Link2} iconBg="bg-blue-500/15" iconColor="text-blue-400" onClick={() => navigate('/management?tab=requirements')} />
+          <StatCard label="Defeitos Abertos" value={overview.totalDefects} icon={Bug} iconBg="bg-rose-500/15" iconColor="text-rose-400" onClick={() => navigate('/management?tab=defects')} />
           <StatCard label="Gerados por IA" value={overview.aiGenerated} sub="planos + casos" icon={Sparkles} iconBg="bg-pink-500/15" iconColor="text-pink-400" />
         </div>
       </section>
 
-      {/* ── Execuções + Cobertura ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── Painel de Performance & Qualidade (3 Colunas Balanceadas) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Coluna 1: Resultado das Execuções */}
+        <div className="border border-border/70 rounded-lg p-4 bg-card/80 space-y-3.5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 border-b border-border/40">
+              <div className="flex items-center gap-2">
+                <PlayCircle className="h-4 w-4 text-emerald-400" />
+                <p className="text-sm font-semibold text-foreground">Execuções de Teste</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className={`text-base font-bold ${passRate >= 80 ? 'text-emerald-400' : passRate >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                  {passRate}%
+                </span>
+                <span className="text-[11px] text-muted-foreground">sucesso</span>
+              </div>
+            </div>
 
-        {/* Execuções */}
-        <div className="border border-border rounded-lg p-4 bg-card space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Resultado das Execuções</p>
-            <div className="flex items-center gap-1.5">
-              <span className={`text-lg font-bold ${passRate >= 80 ? 'text-emerald-400' : passRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
-                {passRate}%
-              </span>
-              <span className="text-xs text-muted-foreground">aprovação</span>
+            <div className="space-y-2.5 mt-3">
+              <BarRow label="Aprovados" value={execStats.passed} max={overview.totalExecutions || 1} color="bg-emerald-500" />
+              <BarRow label="Falharam" value={execStats.failed} max={overview.totalExecutions || 1} color="bg-rose-500" />
+              <BarRow label="Bloqueados" value={execStats.blocked} max={overview.totalExecutions || 1} color="bg-amber-500" />
+              <BarRow label="Não Testados" value={execStats.not_tested} max={overview.totalExecutions || 1} color="bg-muted-foreground/30" />
             </div>
           </div>
-          <div className="space-y-2">
-            <BarRow label="Aprovado" value={execStats.passed} max={overview.totalExecutions} color="bg-emerald-500" />
-            <BarRow label="Falhou" value={execStats.failed} max={overview.totalExecutions} color="bg-red-500" />
-            <BarRow label="Bloqueado" value={execStats.blocked} max={overview.totalExecutions} color="bg-amber-500" />
-            <BarRow label="Não testado" value={execStats.not_tested} max={overview.totalExecutions} color="bg-muted-foreground/30" />
-          </div>
+
           <button
-            className="text-xs text-brand hover:underline flex items-center gap-0.5 mt-1"
+            className="text-xs text-brand hover:underline flex items-center justify-between pt-2 border-t border-border/40 font-medium group"
             onClick={() => navigate('/executions')}
           >
-            Ver todas as execuções <ChevronRight className="h-3 w-3" />
+            <span>Ver todas as execuções</span>
+            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
         </div>
 
-        {/* Cobertura + Defeitos */}
-        <div className="space-y-3">
-          {/* Cobertura */}
-          <div className="border border-border rounded-lg p-4 bg-card space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">Cobertura de Requisitos</p>
-              <span className={`text-base font-bold ${coverageRate >= 80 ? 'text-emerald-400' : coverageRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+        {/* Coluna 2: Cobertura & Confiabilidade */}
+        <div className="border border-border/70 rounded-lg p-4 bg-card/80 space-y-3.5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 border-b border-border/40">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-blue-400" />
+                <p className="text-sm font-semibold text-foreground">Cobertura & Confiabilidade</p>
+              </div>
+              <span className={`text-base font-bold ${coverageRate >= 80 ? 'text-emerald-400' : coverageRate >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
                 {coverageRate}%
               </span>
             </div>
-            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${coverageRate >= 80 ? 'bg-emerald-500' : coverageRate >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-                style={{ width: `${coverageRate}%` }}
-              />
-            </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span><span className="font-medium text-emerald-400">{coverage.covered}</span> cobertos</span>
-              <span><span className="font-medium text-muted-foreground">{coverage.total - coverage.covered}</span> sem cobertura</span>
+
+            <div className="space-y-3 mt-3">
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                  <span>Progresso de Cobertura</span>
+                  <span className="font-medium text-foreground">{coverage.covered}/{coverage.total} requisitos</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${coverageRate >= 80 ? 'bg-emerald-500' : coverageRate >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                    style={{ width: `${coverageRate}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                <div className="p-2 rounded-md bg-muted/25 border border-border/40">
+                  <div className="text-[10px] text-muted-foreground uppercase font-semibold">Requisitos Cobertos</div>
+                  <div className="text-sm font-bold text-emerald-400 mt-0.5">{coverage.covered}</div>
+                </div>
+                <div className="p-2 rounded-md bg-muted/25 border border-border/40">
+                  <div className="text-[10px] text-muted-foreground uppercase font-semibold">Sem Casos de Teste</div>
+                  <div className="text-sm font-bold text-amber-400 mt-0.5">{Math.max(0, coverage.total - coverage.covered)}</div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Defeitos */}
-          <div className="border border-border rounded-lg p-4 bg-card">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold">Defeitos</p>
-              <button className="text-xs text-brand hover:underline flex items-center gap-0.5" onClick={() => navigate('/management?tab=defects')}>
-                Ver todos <ChevronRight className="h-3 w-3" />
-              </button>
+          <button
+            className="text-xs text-brand hover:underline flex items-center justify-between pt-2 border-t border-border/40 font-medium group"
+            onClick={() => navigate('/management?tab=traceability')}
+          >
+            <span>Abrir Matriz de Rastreabilidade</span>
+            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        </div>
+
+        {/* Coluna 3: Monitor de Defeitos */}
+        <div className="border border-border/70 rounded-lg p-4 bg-card/80 space-y-3.5 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 border-b border-border/40">
+              <div className="flex items-center gap-2">
+                <Bug className="h-4 w-4 text-rose-400" />
+                <p className="text-sm font-semibold text-foreground">Defeitos & Severidade</p>
+              </div>
+              <span className={`text-base font-bold ${defectStats.open === 0 ? 'text-emerald-400' : defectStats.critical > 0 ? 'text-rose-400' : 'text-amber-400'}`}>
+                {defectStats.open} abertos
+              </span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-md bg-muted/40 p-2.5 text-center">
-                <div className="text-xl font-bold text-red-400">{defectStats.open}</div>
-                <div className="text-[11px] text-muted-foreground">Abertos</div>
+
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="rounded-md bg-rose-500/10 border border-rose-500/20 p-2.5 text-center">
+                <div className="text-xl font-bold text-rose-400">{defectStats.open}</div>
+                <div className="text-[11px] text-muted-foreground font-medium">Abertos</div>
               </div>
-              <div className="rounded-md bg-muted/40 p-2.5 text-center">
+              <div className="rounded-md bg-orange-500/10 border border-orange-500/20 p-2.5 text-center">
                 <div className="text-xl font-bold text-orange-400">{defectStats.critical}</div>
-                <div className="text-[11px] text-muted-foreground">Críticos</div>
+                <div className="text-[11px] text-muted-foreground font-medium">Críticos</div>
               </div>
-              <div className="rounded-md bg-muted/40 p-2.5 text-center">
+              <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-2.5 text-center">
                 <div className="text-xl font-bold text-amber-400">{defectStats.high}</div>
-                <div className="text-[11px] text-muted-foreground">Alta sev.</div>
+                <div className="text-[11px] text-muted-foreground font-medium">Alta Sev.</div>
               </div>
             </div>
           </div>
+
+          <button
+            className="text-xs text-brand hover:underline flex items-center justify-between pt-2 border-t border-border/40 font-medium group"
+            onClick={() => navigate('/management?tab=defects')}
+          >
+            <span>Gerenciar todos os defeitos</span>
+            <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
         </div>
       </div>
 
-      {/* ── Progresso de Planos + Atividade Recente ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-0">
+      {/* ── Progresso de Planos + Atividade Recente (Mesma Altura Balanceada) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        {/* Progresso por Plano */}
+        <div className="lg:col-span-3 border border-border/70 rounded-lg p-4 bg-card/80 h-[340px] flex flex-col justify-between shadow-xs">
+          <div>
+            <div className="flex items-center justify-between shrink-0 mb-3 pb-2 border-b border-border/40">
+              <p className="text-sm font-semibold text-foreground">Progresso por Plano de Teste</p>
+              <button className="text-xs text-brand hover:underline flex items-center gap-0.5 font-medium" onClick={() => navigate('/plans')}>
+                Ver todos <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
 
-        {/* Progresso */}
-        <div className="lg:col-span-3 border border-border rounded-lg p-4 bg-card flex flex-col" style={{ height: 'fit-content', maxHeight: '380px' }}>
-          <div className="flex items-center justify-between shrink-0 mb-3">
-            <p className="text-sm font-semibold">Progresso por Plano</p>
-            <button className="text-xs text-brand hover:underline flex items-center gap-0.5" onClick={() => navigate('/plans')}>
-              Ver todos <ChevronRight className="h-3 w-3" />
-            </button>
-          </div>
-          {progressRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Nenhum plano com dados ainda.</p>
-          ) : (
-            <div className="space-y-3 overflow-hidden">
-              {progressRows.map(row => (
+            <div className="space-y-2.5">
+              {displayedPlans.map(row => (
                 <div
                   key={row.planId}
-                  className="space-y-1 cursor-pointer hover:bg-muted/20 rounded-lg p-1.5 -mx-1.5 transition-colors"
+                  className="space-y-1.5 cursor-pointer hover:bg-muted/30 rounded-md p-2 -mx-1 border border-border/40 bg-muted/10 transition-colors"
                   onClick={() => { setSelectedItem({ item: row.plan, type: 'plan' }); setShowDetailModal(true); }}
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium truncate pr-2 flex-1">
+                    <span className="font-semibold truncate pr-2 flex-1 text-foreground">
                       {row.sequence ? `PT-${String(row.sequence).padStart(3, '0')} — ` : ''}{row.title}
                     </span>
-                    <span className="text-brand font-semibold shrink-0">{row.percent}%</span>
+                    <span className="text-brand font-bold shrink-0">{row.percent}%</span>
                   </div>
                   <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                     <div className="h-full bg-brand rounded-full transition-all" style={{ width: `${row.percent}%` }} />
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{row.total} casos vinculados</div>
+                  <div className="text-[10px] text-muted-foreground">{row.total} casos de teste vinculados</div>
+                </div>
+              ))}
+
+              {/* Linhas vagas para completar o grid e manter alinhamento exato de altura */}
+              {Array.from({ length: emptySlotsCount }).map((_, idx) => (
+                <div 
+                  key={`empty-slot-${idx}`} 
+                  className="border border-dashed border-border/40 rounded-md p-2.5 flex items-center justify-center text-[11px] text-muted-foreground/45 font-medium"
+                >
+                  <span className="flex items-center gap-1.5 opacity-60">
+                    <MinusCircle className="h-3 w-3" />
+                    Linha disponível · Sem plano adicional
+                  </span>
                 </div>
               ))}
             </div>
-          )}
+          </div>
+
+          <div className="text-[11px] text-muted-foreground pt-2 border-t border-border/30 flex justify-between items-center">
+            <span>Total de planos: <strong className="text-foreground">{overview.totalPlans}</strong></span>
+            <span className="text-[10px] text-muted-foreground/70">Clique em um plano para ver detalhes</span>
+          </div>
         </div>
 
         {/* Atividade Recente */}
-        <div className="lg:col-span-2 border border-border rounded-lg p-4 bg-card flex flex-col" style={{ height: 'fit-content', maxHeight: '340px' }}>
-          <p className="text-sm font-semibold mb-2 shrink-0">Atividade Recente</p>
-          {recentItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">Nenhuma atividade recente.</p>
-          ) : (
-            <div className="divide-y divide-border overflow-y-auto scrollbar-auto-hide pr-1">
-              {recentItems.map(item => {
-                const conf = TYPE_ICON_MAP[item.type];
-                const Icon = conf.icon;
-                return (
-                  <div
-                    key={`${item.type}-${item.id}`}
-                    className="flex items-center gap-2.5 py-2 cursor-pointer hover:bg-muted/20 rounded-md px-1.5 -mx-1.5 transition-colors"
-                    onClick={() => { setSelectedItem({ item: item.data, type: item.type }); setShowDetailModal(true); }}
-                  >
-                    <div className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${conf.bg}`}>
-                      <Icon className={`h-3.5 w-3.5 ${conf.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium truncate">{item.title}</div>
-                      <div className="text-[11px] text-muted-foreground">{TYPE_LABEL[item.type]} · {relativeTime(item.updated_at)}</div>
-                    </div>
-                    {Boolean(item.generated_by_ai) && (
-                      <Sparkles className="h-3 w-3 text-pink-400 shrink-0" />
-                    )}
-                  </div>
-                );
-              })}
+        <div className="lg:col-span-2 border border-border/70 rounded-lg p-4 bg-card/80 h-[340px] flex flex-col justify-between shadow-xs">
+          <div>
+            <div className="flex items-center justify-between shrink-0 mb-3 pb-2 border-b border-border/40">
+              <p className="text-sm font-semibold text-foreground">Atividade Recente</p>
+              <span className="text-[11px] text-muted-foreground font-medium">Tempo real</span>
             </div>
-          )}
+
+            {recentItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-8 text-center">Nenhuma atividade recente registrada.</p>
+            ) : (
+              <div className="divide-y divide-border/40 max-h-[225px] overflow-y-auto scrollbar-auto-hide pr-1 space-y-0.5">
+                {recentItems.slice(0, 5).map(item => {
+                  const conf = TYPE_ICON_MAP[item.type] || TYPE_ICON_MAP.case;
+                  const Icon = conf.icon;
+                  return (
+                    <div
+                      key={`${item.type}-${item.id}`}
+                      className="flex items-center gap-2.5 py-1.5 cursor-pointer hover:bg-muted/30 rounded-md px-1.5 -mx-1 transition-colors"
+                      onClick={() => { setSelectedItem({ item: item.data, type: item.type }); setShowDetailModal(true); }}
+                    >
+                      <div className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${conf.bg} border border-border/30`}>
+                        <Icon className={`h-3.5 w-3.5 ${conf.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold truncate text-foreground">{item.title}</div>
+                        <div className="text-[10px] text-muted-foreground">{TYPE_LABEL[item.type]} · {relativeTime(item.updated_at)}</div>
+                      </div>
+                      {Boolean(item.generated_by_ai) && (
+                        <Sparkles className="h-3 w-3 text-pink-400 shrink-0" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="text-[10px] text-muted-foreground/70 pt-2 border-t border-border/30 text-right">
+            Últimas 5 alterações sincronizadas
+          </div>
         </div>
       </div>
 

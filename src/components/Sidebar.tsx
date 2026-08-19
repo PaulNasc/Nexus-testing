@@ -215,11 +215,10 @@ export const Sidebar = () => {
           </nav>
           
           {isExpanded && (
-          <div className="p-4 border-t border-sidebar-border">
-            <p className="text-xs text-muted-foreground">
-              Geração inteligente de testes
-            </p>
-          </div>
+            <div className="px-4 py-3 border-t border-sidebar-border/60 flex items-center justify-between text-[11px] text-muted-foreground/70 font-medium">
+              <span>Nexus TCMS</span>
+              <span className="bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground">v1.0.0</span>
+            </div>
           )}
         </div>
       </div>

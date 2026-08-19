@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Moon, Sun, Settings, User, LogOut, Shield, Info, Bell, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  Moon, Sun, Settings, User, LogOut, Shield, Info, Bell, Check, 
+  ChevronDown, ChevronUp, Search, Plus, LayoutDashboard, 
+  ClipboardList, FlaskConical, Play, Repeat, Kanban, TrendingUp, Cpu, Users
+} from 'lucide-react';
 import KrigzisLogo from '@/components/branding/KrigzisLogo';
 import { ProjectPicker } from '@/components/ProjectPicker';
 import { useTheme } from '@/hooks/useTheme';
@@ -15,18 +19,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { SettingsModal } from '@/components/SettingsModal';
 import { ProfileModal } from '@/components/ProfileModal';
 import { NotificationModal, type NotificationItem } from '@/components/NotificationModal';
 import { useNotificationSSE } from '@/hooks/useNotificationSSE';
 import { apiClient } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
-const ROLE_INFO: Record<string, { name: string; color: string }> = {
-  master:  { name: 'Master',         color: 'text-purple-500' },
-  admin:   { name: 'Administrador',  color: 'text-red-500'    },
-  manager: { name: 'Gerente',        color: 'text-blue-500'   },
-  tester:  { name: 'Testador',       color: 'text-green-500'  },
-  viewer:  { name: 'Visualizador',   color: 'text-gray-500'   },
+const ROLE_INFO: Record<string, { name: string; color: string; badge: string }> = {
+  master:  { name: 'Master',         color: 'text-purple-400', badge: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+  admin:   { name: 'Administrador',  color: 'text-red-400',    badge: 'bg-red-500/10 text-red-400 border-red-500/20' },
+  manager: { name: 'Gerente',        color: 'text-blue-400',   badge: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  tester:  { name: 'Testador',       color: 'text-emerald-400',badge: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+  viewer:  { name: 'Visualizador',   color: 'text-zinc-400',   badge: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
 };
 
 export const Header = () => {
@@ -42,6 +55,19 @@ export const Header = () => {
   const [notifs, setNotifs] = useState<NotificationItem[]>([]);
   const [showAllNotifs, setShowAllNotifs] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+
+  // Global hotkey: Ctrl+K or Cmd+K to open Command Palette
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setCommandOpen((open) => !open);
+      }
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, []);
 
   const unreadCount = notifs.filter(n => !n.read_at).length;
 
@@ -133,45 +159,91 @@ export const Header = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-background border-b border-border">
-        <div className="flex items-center justify-between px-6 h-[72px]">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center gap-2">
-              <KrigzisLogo size={24} className="h-6 w-6" />
-              <h1 className="text-2xl font-bold text-foreground hidden md:block">
-                Nexus Testing
-              </h1>
+      <header className="sticky top-0 z-20 bg-background/95 backdrop-blur-xs border-b border-border">
+        <div className="flex items-center justify-between px-4 sm:px-6 h-[70px] gap-4">
+          {/* Lado Esquerdo: Mobile Logo + Seletor de Projeto */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Logo visível apenas no mobile (onde a sidebar fica recolhida) */}
+            <div className="flex items-center gap-2 lg:hidden">
+              <KrigzisLogo size={22} className="h-5 w-5" />
+              <span className="font-bold text-base text-foreground">Nexus</span>
             </div>
-            <p className="hidden lg:block text-sm font-medium accent-gradient-text opacity-90">
-              Geração inteligente de testes
-            </p>
-            <div className="hidden md:block ml-4">
-              <ProjectPicker />
-            </div>
+            
+            {/* Seletor de Projeto enriquecido */}
+            <ProjectPicker />
           </div>
 
-          <div className="flex items-center space-x-1">
-            <Button variant="ghost" size="icon" onClick={toggleMode} className="relative">
-              {mode === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+          {/* Centro: Barra de Comando Global / Busca Rápida (Elimina espaço em branco) */}
+          <div className="flex-1 max-w-md hidden md:flex items-center justify-center">
+            <button
+              onClick={() => setCommandOpen(true)}
+              className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-md border border-border/70 bg-muted/20 hover:bg-muted/40 hover:border-border text-xs text-muted-foreground transition-all shadow-xs group cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Search className="h-3.5 w-3.5 text-muted-foreground/70 group-hover:text-foreground transition-colors" />
+                <span className="group-hover:text-foreground/90 transition-colors">Buscar casos, planos, execuções...</span>
+              </div>
+              <kbd className="pointer-events-none inline-flex h-4 select-none items-center gap-0.5 rounded border border-border/60 bg-muted/60 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <span className="text-[10px]">Ctrl</span>K
+              </kbd>
+            </button>
+          </div>
+
+          {/* Lado Direito: Ações Rápidas + Notificações + Tema + Card de Usuário */}
+          <div className="flex items-center space-x-2 shrink-0">
+            {/* Botão de Criação Rápida */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="default"
+                  className="h-9 px-3 gap-1.5 text-xs font-semibold hidden sm:inline-flex shadow-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Criar</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => navigate('/cases?create=true')}>
+                  <FlaskConical className="mr-2 h-4 w-4 text-teal-400" />
+                  <span>Novo Caso de Teste</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/plans?create=true')}>
+                  <ClipboardList className="mr-2 h-4 w-4 text-purple-400" />
+                  <span>Novo Plano de Teste</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/executions?create=true')}>
+                  <Play className="mr-2 h-4 w-4 text-emerald-400" />
+                  <span>Nova Execução</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/runs?create=true')}>
+                  <Repeat className="mr-2 h-4 w-4 text-amber-400" />
+                  <span>Novo Ciclo (Run)</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Tema Claro/Escuro */}
+            <Button variant="ghost" size="icon" onClick={toggleMode} className="h-9 w-9 rounded-md">
+              {mode === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
 
-            {/* ── Bell button with red-dot indicator ─── */}
+            {/* ── Notificações com Indicador Pulse ─── */}
             <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative group"
+                  className="relative h-9 w-9 rounded-md group"
                   aria-label={`Notificações${unreadCount > 0 ? ` (${unreadCount} não lidas)` : ''}`}
                 >
                   <Bell
-                    className={`h-5 w-5 transition-transform group-hover:scale-110 ${
+                    className={`h-4 w-4 transition-transform group-hover:scale-110 ${
                       unreadCount > 0 ? 'text-brand animate-bell-pulse' : ''
                     }`}
                   />
-                  {/* Red dot badge — always visible when there are unread notifs */}
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-[10px] text-white font-bold border-2 border-background animate-pulse shadow-sm">
+                    <span className="absolute 1.5 1.5 flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-destructive text-[9px] text-white font-bold border-2 border-background shadow-xs">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
@@ -241,22 +313,33 @@ export const Header = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* ── User dropdown ─── */}
+            {/* ── User Card & Dropdown ─── */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <User className="h-5 w-5" />
-                  {role && (
-                    <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${ROLE_INFO[role]?.color || 'bg-muted-foreground'}`} />
-                  )}
+                <Button 
+                  variant="outline" 
+                  className="h-9 px-2 sm:px-2.5 gap-2 rounded-md border-border/70 bg-muted/20 hover:bg-muted/40 hover:border-border transition-all shadow-xs"
+                >
+                  <div className="w-6 h-6 rounded-md bg-brand/10 border border-brand/20 text-brand flex items-center justify-center text-xs font-bold shrink-0">
+                    {(user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="hidden lg:flex flex-col text-left">
+                    <span className="text-xs font-semibold text-foreground leading-tight truncate max-w-[100px]">
+                      {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground leading-tight uppercase tracking-wider font-semibold">
+                      {ROLE_INFO[role || 'viewer']?.name || 'Membro'}
+                    </span>
+                  </div>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground/70 hidden sm:block ml-0.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
-                  <div className="truncate">{user?.email}</div>
+                  <div className="truncate font-semibold">{user?.user_metadata?.full_name || user?.email}</div>
                   <div className="flex items-center mt-1 text-xs text-muted-foreground">
-                    <Shield className={`h-3 w-3 mr-1 ${ROLE_INFO[role]?.color || ''}`} />
-                    {ROLE_INFO[role]?.name || 'Usuário'}
+                    <Shield className={`h-3 w-3 mr-1 ${ROLE_INFO[role || 'viewer']?.color || ''}`} />
+                    {ROLE_INFO[role || 'viewer']?.name || 'Usuário'}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -264,7 +347,6 @@ export const Header = () => {
                   <User className="mr-2 h-4 w-4" />
                   Meu Perfil
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setShowSettings(true)}>
                   <Settings className="mr-2 h-4 w-4" />
                   Configurações
@@ -274,7 +356,7 @@ export const Header = () => {
                   <Info className="mr-2 h-4 w-4" />
                   Sobre
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={signOut} className="text-rose-500 focus:text-rose-500">
                   <LogOut className="mr-2 h-4 w-4" />
                   Sair
                 </DropdownMenuItem>
@@ -283,6 +365,62 @@ export const Header = () => {
           </div>
         </div>
       </header>
+
+      {/* ── Global Command Palette Dialog (Ctrl+K) ─── */}
+      <CommandDialog open={commandOpen} onOpenChange={setCommandOpen}>
+        <CommandInput placeholder="Digite para buscar telas, planos, casos ou ações..." />
+        <CommandList>
+          <CommandEmpty>Nenhum resultado encontrado.</CommandEmpty>
+          <CommandGroup heading="Navegação Rápida">
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/'); }}>
+              <LayoutDashboard className="mr-2 h-4 w-4 text-blue-400" />
+              <span>Dashboard Principal</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/plans'); }}>
+              <ClipboardList className="mr-2 h-4 w-4 text-purple-400" />
+              <span>Planos de Teste</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/cases'); }}>
+              <FlaskConical className="mr-2 h-4 w-4 text-teal-400" />
+              <span>Casos de Teste</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/executions'); }}>
+              <Play className="mr-2 h-4 w-4 text-green-400" />
+              <span>Execuções de Teste</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/runs'); }}>
+              <Repeat className="mr-2 h-4 w-4 text-amber-400" />
+              <span>Ciclos de Teste (Runs)</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/management'); }}>
+              <Kanban className="mr-2 h-4 w-4 text-orange-400" />
+              <span>Gestão & Defeitos</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/reports'); }}>
+              <TrendingUp className="mr-2 h-4 w-4 text-pink-400" />
+              <span>Relatórios Executivos</span>
+            </CommandItem>
+          </CommandGroup>
+          <CommandGroup heading="Administração & Configurações">
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/user-management'); }}>
+              <Users className="mr-2 h-4 w-4 text-emerald-400" />
+              <span>Gerenciamento de Usuários & Equipes</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); navigate('/model-control'); }}>
+              <Cpu className="mr-2 h-4 w-4 text-cyan-400" />
+              <span>Configuração de IA (Model Control)</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); setShowProfile(true); }}>
+              <User className="mr-2 h-4 w-4 text-violet-400" />
+              <span>Meu Perfil</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { setCommandOpen(false); setShowSettings(true); }}>
+              <Settings className="mr-2 h-4 w-4 text-zinc-400" />
+              <span>Preferências do Sistema</span>
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
       <ProfileModal isOpen={showProfile} onClose={() => setShowProfile(false)} />

@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Outlet, useLocation } from 'react-router-dom';
+import { useProject } from '@/contexts/ProjectContext';
 
 interface LayoutProps {
   children?: ReactNode;
@@ -52,6 +53,8 @@ export const Layout = ({ children }: LayoutProps) => {
 
   // carregamento de auth pode ser tratado globalmente; nenhuma tela especial aqui
 
+  const { currentProject } = useProject();
+
   return (
     <div className="min-h-screen h-screen flex flex-col overflow-hidden bg-background">
       <div className="flex flex-1 overflow-hidden">
@@ -64,15 +67,9 @@ export const Layout = ({ children }: LayoutProps) => {
         >
           <Header />
           <main className={cn(
-            "flex-1 overflow-x-hidden px-3 sm:px-5 lg:px-6 xl:px-8 py-4 sm:py-6",
+            "flex-1 overflow-x-hidden px-3 sm:px-5 lg:px-6 xl:px-8 py-4 sm:py-5",
             (location.pathname === '/' || location.pathname.startsWith('/history')) ? 'overflow-hidden' : 'overflow-y-auto'
           )}>
-            {/* Breadcrumbs */}
-            <div className="mb-4 sm:mb-6 text-sm text-muted-foreground flex items-center gap-2">
-              <span className="text-foreground font-medium">Nexus Testing</span>
-              <span className="opacity-70">/</span>
-              <span className="accent-gradient-text font-semibold">{currentTitle}</span>
-            </div>
             <Outlet />
             {children}
           </main>

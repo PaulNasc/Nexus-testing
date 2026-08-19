@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   google_url TEXT,
   website_url TEXT,
   bio TEXT,
+  skills TEXT DEFAULT '',
   tags TEXT DEFAULT '[]',
   active INTEGER DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now')),

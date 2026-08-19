@@ -12,11 +12,11 @@ export const priorityLabel = (p: Priority) => ({
 }[p] || p);
 
 export const priorityBadgeClass = (p: Priority) => ({
-  low: 'bg-green-100 text-green-800 dark:bg-green-400/15 dark:text-green-300 dark:ring-1 dark:ring-green-400/25',
-  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-400/15 dark:text-yellow-300 dark:ring-1 dark:ring-yellow-400/25',
-  high: 'bg-orange-100 text-orange-800 dark:bg-orange-400/15 dark:text-orange-300 dark:ring-1 dark:ring-orange-400/25',
-  critical: 'bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-300 dark:ring-1 dark:ring-red-400/25',
-}[p] || 'bg-gray-100 text-gray-800 dark:bg-gray-400/15 dark:text-gray-300 dark:ring-1 dark:ring-gray-400/25');
+  low: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+  medium: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+  high: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
+  critical: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+}[p] || 'bg-muted/50 text-muted-foreground border border-border/50');
 
 export const severityLabel = priorityLabel;
 export const severityBadgeClass = priorityBadgeClass;
@@ -29,11 +29,11 @@ export const requirementStatusLabel = (s: RequirementStatus) => ({
 }[s] || s);
 
 export const requirementStatusBadgeClass = (s: RequirementStatus) => ({
-  open: 'bg-gray-100 text-gray-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25',
-  in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-1 dark:ring-blue-400/25',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-400/15 dark:text-green-300 dark:ring-1 dark:ring-green-400/25',
-  deprecated: 'bg-slate-200 text-slate-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25',
-}[s] || 'bg-gray-100 text-gray-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25');
+  open: 'bg-muted/50 text-muted-foreground border border-border/50',
+  in_progress: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+  approved: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+  deprecated: 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
+}[s] || 'bg-muted/50 text-muted-foreground border border-border/50');
 
 export const defectStatusLabel = (s: DefectStatus) => ({
   open: 'Aberto',
@@ -44,12 +44,12 @@ export const defectStatusLabel = (s: DefectStatus) => ({
 }[s] || s);
 
 export const defectStatusBadgeClass = (s: DefectStatus) => ({
-  open: 'bg-gray-100 text-gray-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25',
-  in_analysis: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-400/15 dark:text-yellow-300 dark:ring-1 dark:ring-yellow-400/25',
-  fixed: 'bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-1 dark:ring-blue-400/25',
-  validated: 'bg-green-100 text-green-800 dark:bg-green-400/15 dark:text-green-300 dark:ring-1 dark:ring-green-400/25',
-  closed: 'bg-slate-200 text-slate-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25',
-}[s] || 'bg-gray-100 text-gray-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25');
+  open: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+  in_analysis: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+  fixed: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+  validated: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+  closed: 'bg-muted/50 text-muted-foreground border border-border/50',
+}[s] || 'bg-muted/50 text-muted-foreground border border-border/50');
 
 export const testCaseTypeLabel = (t: TestCaseType) => ({
   functional: 'Funcional',
@@ -60,12 +60,12 @@ export const testCaseTypeLabel = (t: TestCaseType) => ({
 }[t] || (t as string));
 
 export const testCaseTypeBadgeClass = (t: TestCaseType) => ({
-  functional: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-400/15 dark:text-indigo-300 dark:ring-1 dark:ring-indigo-400/25',
-  integration: 'bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-300 dark:ring-1 dark:ring-blue-400/25',
-  performance: 'bg-purple-100 text-purple-800 dark:bg-purple-400/15 dark:text-purple-300 dark:ring-1 dark:ring-purple-400/25',
-  security: 'bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-300 dark:ring-1 dark:ring-red-400/25',
-  usability: 'bg-teal-100 text-teal-800 dark:bg-teal-400/15 dark:text-teal-300 dark:ring-1 dark:ring-teal-400/25',
-}[t] || 'bg-gray-100 text-gray-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25');
+  functional: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
+  integration: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+  performance: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
+  security: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+  usability: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20',
+}[t] || 'bg-muted/50 text-muted-foreground border border-border/50');
 
 // Execuções de Teste
 export const executionStatusLabel = (s: ExecutionStatus) => ({
@@ -76,8 +76,8 @@ export const executionStatusLabel = (s: ExecutionStatus) => ({
 }[s] || (s as string));
 
 export const executionStatusBadgeClass = (s: ExecutionStatus) => ({
-  passed: 'bg-green-100 text-green-800 dark:bg-green-400/15 dark:text-green-300 dark:ring-1 dark:ring-green-400/25',
-  failed: 'bg-red-100 text-red-800 dark:bg-red-400/15 dark:text-red-300 dark:ring-1 dark:ring-red-400/25',
-  blocked: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-400/15 dark:text-yellow-300 dark:ring-1 dark:ring-yellow-400/25',
-  not_tested: 'bg-gray-100 text-gray-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25',
-}[s] || 'bg-gray-100 text-gray-800 dark:bg-slate-400/15 dark:text-slate-300 dark:ring-1 dark:ring-slate-400/25');
+  passed: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+  failed: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+  blocked: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+  not_tested: 'bg-muted/50 text-muted-foreground border border-border/50',
+}[s] || 'bg-muted/50 text-muted-foreground border border-border/50');

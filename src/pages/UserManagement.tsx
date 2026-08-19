@@ -171,29 +171,29 @@ export const UserManagement = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      if (SINGLE_TENANT) {
+      const { data: profiles, error: profErr } = await apiClient.from('profiles').select('id, display_name, role, email, created_at').order('display_name');
+      let rows: Array<{ id: string; email: string | null; display_name: string | null; role: string | null; created_at: string }> = [];
+
+      if (profErr || !profiles || (profiles as any[]).length === 0) {
         const { data: authData } = await apiClient.auth.getUser();
         const cur = authData?.user;
         if (cur) {
-          setUsers([{
+          rows = [{
             id: cur.id,
             email: cur.email || '',
-            created_at: cur.created_at,
-            profile: { display_name: (cur.user_metadata as Record<string, unknown>)?.full_name as string || 'Master', role: 'master', organization_id: null },
-            permissions: getDefaultPermissions('master'),
-          }]);
+            display_name: (cur.user_metadata as Record<string, unknown>)?.full_name as string || 'Master',
+            role: 'master',
+            created_at: cur.created_at || '',
+          }];
         }
-        return;
-      }
-
-      const { data: allUsers, error: listErr } = await apiClient.rpc('list_all_users');
-      let rows: Array<{ id: string; email: string | null; display_name: string | null; role: string | null; created_at: string }> = [];
-
-      if (listErr || !allUsers || (allUsers as any[]).length === 0) {
-        const { data: profiles } = await apiClient.from('profiles').select('id, display_name, role, email').order('display_name');
-        rows = (profiles || []).map((p: any) => ({ id: p.id, email: p.email, display_name: p.display_name, role: p.role, created_at: '' }));
       } else {
-        rows = allUsers as typeof rows;
+        rows = (profiles || []).map((p: any) => ({
+          id: p.id,
+          email: p.email,
+          display_name: p.display_name,
+          role: p.role,
+          created_at: p.created_at || ''
+        }));
       }
 
       const ids = rows.map(r => r.id);
@@ -259,9 +259,8 @@ export const UserManagement = () => {
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    if (SINGLE_TENANT) { toast({ title: 'Papel fixo', description: 'No modo single-tenant o papel é Master.' }); return; }
     if (!(role === 'master' || role === 'admin')) {
-      toast({ title: 'Acesso negado', variant: 'destructive' }); return;
+      toast({ title: 'Acesso negado', description: 'Apenas administradores podem alterar papéis.', variant: 'destructive' }); return;
     }
     const { error } = await apiClient.from('profiles').update({ role: newRole }).eq('id', userId);
     if (error) { toast({ title: 'Erro ao alterar papel', description: error.message, variant: 'destructive' }); return; }
@@ -272,13 +271,12 @@ export const UserManagement = () => {
       profile: { ...(u.profile ?? { display_name: null, organization_id: null, role: 'viewer' as UserRole }), role: newRole as UserRole },
       permissions: defaults,
     } : u));
-    toast({ title: 'Papel atualizado' });
+    toast({ title: 'Papel atualizado com sucesso' });
   };
 
   const handlePermissionChange = async (userId: string, perm: string, value: boolean) => {
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, permissions: { ...u.permissions, [perm]: value } } : u));
-    if (SINGLE_TENANT) return;
-    if (role !== 'master') { toast({ title: 'Acesso negado', variant: 'destructive' }); return; }
+    if (!(role === 'master' || role === 'admin')) { toast({ title: 'Acesso negado', variant: 'destructive' }); return; }
     const { error } = await apiClient.from('user_permissions').upsert({ user_id: userId, [perm]: value }, { onConflict: 'user_id' });
     if (error) toast({ title: 'Erro ao salvar permissão', description: error.message, variant: 'destructive' });
     else toast({ title: 'Permissão salva' });
@@ -384,26 +382,22 @@ export const UserManagement = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            {SINGLE_TENANT && (
-              <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded px-2 py-1 font-mono">
-                single-tenant
-              </span>
-            )}
-            {!SINGLE_TENANT && canManage() && (
+            {canManage() && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleSyncProfiles} disabled={syncingProfiles}>
-                      {syncingProfiles ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                    <Button variant="outline" size="sm" onClick={handleSyncProfiles} disabled={syncingProfiles} className="h-8 gap-1.5 text-xs">
+                      {syncingProfiles ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                      Sincronizar
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Sincronizar perfis</TooltipContent>
+                  <TooltipContent>Recarregar lista de usuários</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )}
-            {!SINGLE_TENANT && isMaster() && (
-              <Button size="sm" onClick={() => setInviteOpen(true)}>
-                <UserPlus className="h-4 w-4 mr-2" />
+            {isMaster() && (
+              <Button size="sm" onClick={() => setInviteOpen(true)} className="h-8 gap-1.5 text-xs">
+                <UserPlus className="h-3.5 w-3.5" />
                 Convidar Usuário
               </Button>
             )}

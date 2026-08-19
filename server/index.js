@@ -367,6 +367,7 @@ function getNextSequence(table, projectId = null) {
     'ALTER TABLE profiles ADD COLUMN website_url TEXT',
     'ALTER TABLE profiles ADD COLUMN tags TEXT DEFAULT \'[]\'',
     'ALTER TABLE profiles ADD COLUMN bio TEXT',
+    'ALTER TABLE profiles ADD COLUMN skills TEXT DEFAULT \'\'',
     'ALTER TABLE defects ADD COLUMN user_id TEXT',
     'ALTER TABLE defects ADD COLUMN plan_id TEXT REFERENCES test_plans(id) ON DELETE SET NULL',
     'ALTER TABLE activity_logs ADD COLUMN context TEXT',

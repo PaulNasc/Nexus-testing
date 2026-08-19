@@ -119,30 +119,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         setLoading(true);
         if (!user) return;
 
-        if (SINGLE_TENANT) {
-          const { data } = await supabase.auth.getUser();
-          const u = data?.user;
-          setEmail(u?.email || '');
-          setDisplayName((u?.user_metadata as any)?.full_name || '');
-          setAvatarUrl((u?.user_metadata as any)?.avatar_url || '');
-          setGithubUrl((u?.user_metadata as any)?.github_url || '');
-          setGoogleUrl((u?.user_metadata as any)?.google_url || '');
-          setWebsiteUrl((u?.user_metadata as any)?.website_url || '');
-          setProfile({
-            id: u?.id || '',
-            email: u?.email || '',
-            display_name: (u?.user_metadata as any)?.full_name || '',
-            role: (role || 'viewer') as UserRole,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            organization_id: null,
-          } as Profile);
-          return;
-        }
-
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, display_name, email, role, created_at, updated_at, tags, avatar_url, github_url, google_url, website_url')
+          .select('id, display_name, email, role, created_at, updated_at, tags, avatar_url, github_url, google_url, website_url, bio, skills')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -151,6 +130,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           toast({ title: 'Erro', description: 'Não foi possível carregar seu perfil.', variant: 'destructive' });
           return;
         }
+
         if (data) {
           setProfile(data as Profile);
           setDisplayName((data as any).display_name || '');
@@ -175,7 +155,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             console.error('Error fetching functional roles:', e);
           }
 
-          // Fetch groups instead of manual tags
+          // Fetch groups for the user
           try {
             const { data: mData } = await supabase
               .from('group_members' as any)
@@ -189,18 +169,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 .select('name, color')
                 .in('id', groupIds);
               
-              if (gData) {
+              if (gData && gData.length > 0) {
                 setTags(gData.map((g: any) => ({
                   label: g.name,
-                  color: g.color,
+                  color: g.color || '#3b82f6',
                   icon: 'tag'
                 })));
+              } else {
+                setTags([]);
               }
             } else {
               setTags([]);
             }
           } catch (e) {
             console.error('Error fetching group tags:', e);
+            setTags([]);
           }
         }
 
@@ -471,16 +454,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                   <Users className="h-3.5 w-3.5" /> Seus Grupos
                 </Label>
-                <div className="flex flex-wrap gap-2 p-2 min-h-[40px]">
+                <div className="flex flex-wrap gap-2 p-2.5 min-h-[44px] rounded-md border border-border/60 bg-muted/20 items-center">
                   {tags.length > 0 ? tags.map((t, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-muted/50 text-foreground/80 border border-border/50">
-                      <TagIcon className="h-3 w-3 opacity-70" style={{ color: t.color || undefined }} /> {t.label}
+                    <span 
+                      key={idx} 
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold border shadow-xs transition-colors"
+                      style={{ 
+                        backgroundColor: t.color ? `${t.color}18` : 'rgba(59, 130, 246, 0.12)', 
+                        borderColor: t.color ? `${t.color}40` : 'rgba(59, 130, 246, 0.3)', 
+                        color: t.color || '#3b82f6' 
+                      }}
+                    >
+                      <TagIcon className="h-3.5 w-3.5" style={{ color: t.color || '#3b82f6' }} />
+                      {t.label}
                     </span>
                   )) : (
-                    <span className="text-[10px] text-muted-foreground italic">Nenhum grupo vinculado</span>
+                    <span className="text-xs text-muted-foreground italic">Nenhum grupo vinculado</span>
                   )}
                 </div>
-                <p className="text-[10px] text-muted-foreground px-1 italic">Sincronizado automaticamente com a gestão de usuários.</p>
+                <p className="text-[11px] text-muted-foreground px-0.5">Sincronizado automaticamente com a estrutura de times e grupos.</p>
               </div>
             </div>
           </div>

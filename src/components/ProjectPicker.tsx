@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
-import { Check, Folder } from 'lucide-react';
+import { Check, Folder, ChevronDown, FolderGit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Project } from '@/types';
@@ -118,28 +118,26 @@ export function ProjectPicker() {
   return (
     <div className="flex items-center gap-2">
       <Popover open={open} onOpenChange={setOpen}>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={currentProject ? `Projeto selecionado: ${currentProject.name}` : 'Selecionar projeto'}
-                  className="h-8 w-8"
-                >
-                  <span className="relative inline-flex h-4 w-4 items-center justify-center">
-                    {/* Ícone somente com contorno: usa a cor do `--foreground` do tema */}
-                    <Folder className="h-4 w-4 text-foreground" />
-                  </span>
-                </Button>
-              </PopoverTrigger>
-            </TooltipTrigger>
-            <TooltipContent>
-              {currentProject ? `Projeto selecionado: ${currentProject.name}` : 'Selecionar projeto'}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={currentProject ? `Projeto selecionado: ${currentProject.name}` : 'Selecionar projeto'}
+            className="h-9 px-3 gap-2 rounded-md border-border/70 bg-muted/20 hover:bg-muted/40 hover:border-border text-foreground font-medium transition-all shadow-xs"
+          >
+            <div className="flex items-center gap-2">
+              <span 
+                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" 
+                style={{ backgroundColor: currentProject?.color || '#10b981' }} 
+              />
+              <span className="text-xs text-muted-foreground font-normal hidden sm:inline">Projeto:</span>
+              <span className="text-xs font-semibold max-w-[140px] md:max-w-[200px] truncate text-foreground">
+                {currentProject ? currentProject.name : 'Todos os Projetos'}
+              </span>
+            </div>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0 ml-0.5" />
+          </Button>
+        </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0">
           <div className="px-3 py-2 text-xs text-muted-foreground">Selecionar projeto</div>
           <Command>
