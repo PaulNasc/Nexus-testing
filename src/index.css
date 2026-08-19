@@ -43,13 +43,17 @@
   width: 8px;
 }
 
-/* Auto-hide scrollbar (invisible by default) */
-.scrollbar-auto-hide {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE 10+ */
+/* Auto-hide scrollbar & invisible scrollbar utilities */
+.scrollbar-auto-hide,
+.no-scrollbar,
+.scrollbar-none {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE and Edge */
 }
-.scrollbar-auto-hide::-webkit-scrollbar {
-  display: none;
+.scrollbar-auto-hide::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
   width: 0px !important;
   height: 0px !important;
   background: transparent !important;

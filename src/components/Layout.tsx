@@ -66,7 +66,7 @@ export const Layout = ({ children }: LayoutProps) => {
           )}
         >
           <Header />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-auto-hide px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4">
             <Outlet />
             {children}
           </main>
