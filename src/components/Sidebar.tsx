@@ -59,17 +59,8 @@ export const Sidebar = () => {
 
   // Filter navigation items based on permissions
   const filteredNavigation = navigation.filter(item => {
-    // If no permission is required, show the item
-    if (!item.requiredPermission) {
-      return true;
-    }
-    
-    // Check permission requirement
-    if (item.requiredPermission) {
-      return hasPermission(item.requiredPermission as any);
-    }
-    
-    return true;
+    if (!item.requiredPermission) return true;
+    return hasPermission(item.requiredPermission as any);
   });
 
   // Filter admin items based on permissions
@@ -81,87 +72,104 @@ export const Sidebar = () => {
   return (
     <>
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
+      <div className="lg:hidden fixed top-3.5 left-3.5 z-50">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-md bg-accent text-foreground shadow-md"
+          className="p-2 rounded-md bg-card border border-border/70 text-foreground shadow-md hover:bg-muted transition-colors"
+          aria-label={isOpen ? "Fechar menu" : "Abrir menu"}
         >
-          {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
-      {/* Toggle sidebar button for desktop */}
-      <div className="hidden lg:block fixed top-4 left-4 z-50" style={{ left: isExpanded ? '256px' : '80px' }}>
-        <button
-          onClick={toggleSidebar}
-          className="p-1 rounded-full bg-muted text-foreground/70 shadow-md hover:bg-muted/80 transition-colors"
-        >
-          {isExpanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-40 bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-sm transform transition-all duration-300 ease-in-out lg:translate-x-0 h-full",
+      {/* Sidebar Container */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-40 bg-card/95 backdrop-blur-md text-sidebar-foreground border-r border-border/70 shadow-xs transition-all duration-300 ease-in-out lg:translate-x-0 h-full select-none",
         isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         isExpanded ? "lg:w-64" : "lg:w-20"
       )}>
         <div className="flex flex-col h-full">
+          {/* ── Cabeçalho Integrado da Sidebar (Altura harmonizada h-[70px]) ── */}
           <div className={cn(
-            "flex items-center h-16 px-4 border-b border-sidebar-border",
-            isExpanded ? "justify-center" : "justify-center"
+            "flex items-center h-[70px] border-b border-border/50 transition-all",
+            isExpanded ? "px-4 justify-between" : "px-2 justify-center"
           )}>
             {isExpanded ? (
-              <div className="flex items-center gap-2">
-                <KrigzisLogo size={24} className="h-6 w-6" />
-                <h1 className="text-xl font-bold text-sidebar-foreground">Nexus Testing</h1>
-              </div>
+              <>
+                <Link to="/" className="flex items-center gap-2.5 min-w-0 group">
+                  <div className="h-8 w-8 rounded-md bg-brand/10 border border-brand/25 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105">
+                    <KrigzisLogo size={18} className="h-4.5 w-4.5 text-brand" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-sm text-foreground tracking-tight truncate leading-tight group-hover:text-brand transition-colors">
+                      Nexus Testing
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/80 font-semibold tracking-wider uppercase leading-tight">
+                      TCMS Platform
+                    </span>
+                  </div>
+                </Link>
+                <button
+                  onClick={toggleSidebar}
+                  className="h-7 w-7 rounded-md border border-border/50 bg-muted/20 hover:bg-muted/60 hover:border-border text-muted-foreground hover:text-foreground flex items-center justify-center transition-all shadow-2xs shrink-0"
+                  title="Recolher menu lateral"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+              </>
             ) : (
-              <KrigzisLogo size={24} className="h-6 w-6" />
+              <button
+                onClick={toggleSidebar}
+                className="h-9 w-9 rounded-md bg-brand/10 hover:bg-brand/20 border border-brand/25 flex items-center justify-center text-brand transition-all shadow-2xs group"
+                title="Expandir menu lateral"
+              >
+                <KrigzisLogo size={20} className="h-5 w-5 group-hover:scale-105 transition-transform" />
+              </button>
             )}
           </div>
           
+          {/* ── Navegação Principal ── */}
           <nav className={cn(
-            "flex-1 py-6 space-y-2 overflow-y-auto",
-            isExpanded ? "px-4" : "px-2"
+            "flex-1 py-4 space-y-1 overflow-y-auto scrollbar-auto-hide",
+            isExpanded ? "px-3" : "px-2"
           )}>
             {filteredNavigation.map((item) => {
               const isActive = location.pathname === item.href;
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
                   onClick={() => setIsOpen(false)}
                   className={cn(
-                    "flex items-center py-2 text-sm font-medium rounded-lg transition-colors",
-                    isExpanded ? "px-3 justify-start" : "px-2 justify-center",
+                    "flex items-center py-2 text-xs font-semibold rounded-md transition-all group",
+                    isExpanded ? "px-2.5 justify-start" : "px-2 justify-center",
                     isActive
-                      ? "accent-gradient-bg-soft text-brand-foreground"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      ? "bg-brand/12 text-brand border border-brand/25 shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
                   )}
                   title={!isExpanded ? item.name : undefined}
                 >
-                  <item.icon className={cn("h-5 w-5", isExpanded ? "mr-3" : "", isActive ? "" : item.color)} />
+                  <Icon className={cn(
+                    "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
+                    isExpanded ? "mr-2.5" : "",
+                    isActive ? "text-brand" : item.color
+                  )} />
                   {isExpanded && (
-                    <div className="flex items-center justify-between w-full">
-                      <span>{item.name}</span>
-                    </div>
+                    <span className="truncate flex-1">{item.name}</span>
                   )}
                 </Link>
               );
             })}
 
-            {/* Submenu Módulos: desativado temporariamente */}
-
-            {/* Submenu Administrativo */}
+            {/* ── Submenu Administrativo ── */}
             {(isMaster() || hasPermission('can_access_admin_menu') || hasPermission('can_manage_users')) && (
-              <div className="mt-4">
+              <div className="pt-2 mt-2 border-t border-border/30">
                 <button
                   type="button"
                   onClick={() => {
                     if (!isExpanded) {
                       setIsExpanded(true);
-                      // Emite evento para layout alinhar
                       const event = new CustomEvent('sidebarStateChange', { detail: { expanded: true } });
                       window.dispatchEvent(event);
                     } else {
@@ -169,42 +177,40 @@ export const Sidebar = () => {
                     }
                   }}
                   className={cn(
-                    "w-full flex items-center py-2 text-sm font-semibold rounded-lg transition-colors",
-                    isExpanded ? "px-3 justify-between" : "px-2 justify-center",
-                    "text-sidebar-foreground hover:bg-sidebar-accent"
+                    "w-full flex items-center py-2 text-xs font-semibold rounded-md transition-all group",
+                    isExpanded ? "px-2.5 justify-between" : "px-2 justify-center",
+                    "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
                   )}
                   title={!isExpanded ? 'Administrativo' : undefined}
                 >
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="h-5 w-5 text-red-400" />
-                    {isExpanded && <span>Administrativo</span>}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <ShieldCheck className="h-4 w-4 text-rose-400 shrink-0 group-hover:scale-110 transition-transform" />
+                    {isExpanded && <span className="truncate">Administrativo</span>}
                   </div>
                   {isExpanded && (
-                    <ChevronRight className={cn("h-4 w-4 transition-transform", adminOpen ? "rotate-90" : "rotate-0")} />
+                    <ChevronRight className={cn("h-3.5 w-3.5 transition-transform shrink-0 opacity-70", adminOpen ? "rotate-90" : "rotate-0")} />
                   )}
                 </button>
 
                 {isExpanded && adminOpen && (
-                  <div className="mt-1 space-y-1 pl-8">
+                  <div className="mt-1 space-y-1 pl-4 border-l border-border/40 ml-4.5">
                     {filteredAdminNavigation.map((item) => {
                       const isActive = location.pathname === item.href;
+                      const Icon = item.icon;
                       return (
                         <Link
                           key={item.name}
                           to={item.href}
                           onClick={() => setIsOpen(false)}
                           className={cn(
-                            "flex items-center py-2 text-sm font-medium rounded-lg transition-colors",
-                            "px-3 justify-start",
+                            "flex items-center py-1.5 px-2 text-xs font-semibold rounded-md transition-all group",
                             isActive
-                              ? "accent-gradient-bg-soft text-brand-foreground"
-                              : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                              ? "bg-brand/12 text-brand border border-brand/25 shadow-2xs"
+                              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
                           )}
                         >
-                          <item.icon className={cn("h-4 w-4 mr-3", isActive ? "" : item.color)} />
-                          <div className="flex items-center justify-between w-full">
-                            <span>{item.name}</span>
-                          </div>
+                          <Icon className={cn("h-3.5 w-3.5 mr-2 shrink-0 transition-transform group-hover:scale-110", isActive ? "text-brand" : item.color)} />
+                          <span className="truncate">{item.name}</span>
                         </Link>
                       );
                     })}
@@ -214,19 +220,24 @@ export const Sidebar = () => {
             )}
           </nav>
           
-          {isExpanded && (
-            <div className="px-4 py-3 border-t border-sidebar-border/60 flex items-center justify-between text-[11px] text-muted-foreground/70 font-medium">
-              <span>Nexus TCMS</span>
-              <span className="bg-muted/40 border border-border/40 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground">v1.0.0</span>
+          {/* ── Rodapé Minimalista da Sidebar ── */}
+          {isExpanded ? (
+            <div className="px-4 py-3 border-t border-border/40 flex items-center justify-between text-[11px] text-muted-foreground/70 font-medium">
+              <span className="text-[11px]">Nexus TCMS</span>
+              <span className="bg-muted/40 border border-border/50 px-1.5 py-0.5 rounded-md text-[10px] text-muted-foreground font-mono">v1.0.0</span>
+            </div>
+          ) : (
+            <div className="py-3 border-t border-border/40 flex justify-center text-[10px] text-muted-foreground/50 font-mono">
+              v1.0
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
       {/* Overlay for mobile */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-30 lg:hidden bg-background/80 backdrop-blur-sm"
+          className="fixed inset-0 z-30 lg:hidden bg-background/80 backdrop-blur-xs"
           onClick={() => setIsOpen(false)}
         />
       )}
