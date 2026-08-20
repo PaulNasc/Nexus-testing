@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDashboardSettings } from '@/hooks/useDashboardSettings';
 import { useProject } from '@/contexts/ProjectContext';
 import { applyProjectTheme, resetProjectTheme } from '@/lib/theme/projectTheme';
@@ -37,20 +35,47 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
   });
   const [loadingPrefs, setLoadingPrefs] = useState(false);
 
-  // Carregar preferências de notificação
+  // Carregar preferências de notificação (BD + LocalStorage fallback)
   useEffect(() => {
     const loadPrefs = async () => {
       if (!isOpen || !user) return;
+
+      // 1. Tentar ler do localStorage imediatamente para feedback instantâneo
+      try {
+        const localSaved = localStorage.getItem(`nexus_notif_prefs_${user.id}`);
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          if (parsed && typeof parsed === 'object') {
+            setNotifPrefs({
+              email_enabled: parsed.email_enabled !== false,
+              system_enabled: parsed.system_enabled !== false,
+            });
+          }
+        }
+      } catch {
+        // Ignora erro de parsing local
+      }
+
+      // 2. Sincronizar com o banco de dados
       try {
         setLoadingPrefs(true);
         const { data, error } = await apiClient
           .from('notification_preferences' as any)
-          .select('email_enabled, system_enabled')
+          .select('preferences')
           .eq('user_id', user.id)
           .maybeSingle();
-        
+
         if (!error && data) {
-          setNotifPrefs(data as any);
+          const raw = (data as any).preferences;
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (parsed && typeof parsed === 'object') {
+            const finalPrefs = {
+              email_enabled: parsed.email_enabled !== false,
+              system_enabled: parsed.system_enabled !== false,
+            };
+            setNotifPrefs(finalPrefs);
+            localStorage.setItem(`nexus_notif_prefs_${user.id}`, JSON.stringify(finalPrefs));
+          }
         }
       } catch (err) {
         console.error('Erro ao carregar preferências:', err);
@@ -65,19 +90,25 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
     if (!user) return;
     const newPrefs = { ...notifPrefs, [key]: value };
     setNotifPrefs(newPrefs);
-    
+    localStorage.setItem(`nexus_notif_prefs_${user.id}`, JSON.stringify(newPrefs));
+
     try {
       const { error } = await apiClient
         .from('notification_preferences' as any)
-        .upsert({ user_id: user.id, ...newPrefs }, { onConflict: 'user_id' } as any);
-      
+        .upsert({
+          user_id: user.id,
+          preferences: JSON.stringify(newPrefs),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' } as any);
+
       if (error) throw error;
-    } catch (err: any) {
       toast({
-        title: "Erro ao salvar preferência",
-        description: err.message || "Tente novamente mais tarde",
-        variant: "destructive"
+        title: "Preferência salva",
+        description: "Suas opções de notificação foram atualizadas com sucesso."
       });
+    } catch (err: any) {
+      console.error('Erro ao salvar no servidor:', err);
+      // Mantém no localStorage mesmo com falha temporária
     }
   };
 
@@ -111,15 +142,14 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
         <div className="space-y-5 py-2">
           {/* ─── Aparência e Interface ─── */}
           <Section title="Aparência e Interface" icon={Palette}>
-            <div className="rounded-lg border border-border/60 bg-card/60 p-4 space-y-4 shadow-2xs">
-              {/* Toggle cores do projeto */}
+            <div className="rounded-lg border border-border/60 bg-card/60 p-4 shadow-2xs">
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5 min-w-0">
                   <span className="text-xs font-semibold text-foreground">
                     Aplicar cores do projeto ao tema
                   </span>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Quando ativo, a interface adota automaticamente a cor de destaque do projeto atual.
+                    Quando ativo, a interface adota automaticamente a cor de destaque do projeto selecionado.
                   </p>
                 </div>
                 <Switch
@@ -134,32 +164,7 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                       resetProjectTheme();
                     }
                   }}
-                  className="data-[state=checked]:bg-brand"
                 />
-              </div>
-
-              <div className="border-t border-border/40 pt-3 flex items-center justify-between gap-4">
-                <div className="space-y-0.5 min-w-0">
-                  <Label htmlFor="quick-action" className="text-xs font-semibold text-foreground">
-                    Ação rápida do Dashboard
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Ação primária disparada pelo botão "+" no cabeçalho do painel
-                  </p>
-                </div>
-                <Select
-                  value={dashboardSettings.quickActionType}
-                  onValueChange={(v: 'plan' | 'case' | 'execution') => updateDashboardSettings({ quickActionType: v })}
-                >
-                  <SelectTrigger id="quick-action" className="w-[140px] h-8 text-xs bg-background/60 border-border/70 rounded-md">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-md border-border/70">
-                    <SelectItem value="plan" className="text-xs">Novo Plano</SelectItem>
-                    <SelectItem value="case" className="text-xs">Novo Caso</SelectItem>
-                    <SelectItem value="execution" className="text-xs">Nova Execução</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </Section>
@@ -180,7 +185,6 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                   checked={notifPrefs.system_enabled}
                   onCheckedChange={(v) => updateNotifPref('system_enabled', v)}
                   disabled={loadingPrefs}
-                  className="data-[state=checked]:bg-brand"
                 />
               </div>
 
@@ -197,7 +201,6 @@ export const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                   checked={notifPrefs.email_enabled}
                   onCheckedChange={(v) => updateNotifPref('email_enabled', v)}
                   disabled={loadingPrefs}
-                  className="data-[state=checked]:bg-brand"
                 />
               </div>
             </div>

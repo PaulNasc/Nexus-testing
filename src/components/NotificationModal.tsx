@@ -98,7 +98,7 @@ export const NotificationModal = ({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0 scrollbar-auto-hide">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
               <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
