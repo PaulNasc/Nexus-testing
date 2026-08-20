@@ -859,9 +859,9 @@ export const TestPlans = () => {
       }}>
         <DialogContent className={cn(editingPlan ? "max-w-2xl" : "max-w-4xl", "max-h-[90vh] overflow-hidden flex flex-col scrollbar-auto-hide")}>
           <DialogHeader className="px-6 pt-6 shrink-0">
-            <DialogTitle>{editingPlan ? 'Editar Plano de Teste' : 'Fluxo Unificado de Criação'}</DialogTitle>
+            <DialogTitle>{editingPlan ? 'Editar Plano de Teste' : 'Novo Plano de Teste'}</DialogTitle>
             <DialogDescription>
-              {editingPlan ? 'Ajuste as informações do plano selecionado.' : 'Defina o plano e já gere os casos de teste com IA.'}
+              {editingPlan ? 'Ajuste as informações do plano selecionado.' : 'Defina os dados do plano e adicione casos de teste vinculados se desejar.'}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6">

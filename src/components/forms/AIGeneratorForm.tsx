@@ -978,21 +978,20 @@ export const AIGeneratorForm = ({ onSuccess, initialType = 'plan', hideTypeSelec
               type="submit"
               disabled={loading || !currentProject?.id || (formData.type === 'execution' && (!formData.planId || !formData.caseId))}
               className={cn(
-                "w-full h-12 text-sm font-bold tracking-wide transition-all duration-300 relative overflow-hidden group",
-                loading ? "opacity-90" : "bg-gradient-to-r from-brand via-brand/90 to-brand-secondary hover:shadow-lg hover:shadow-brand/20 active:scale-[0.98]"
+                "w-full h-11 text-xs font-bold tracking-wide rounded-md transition-all shadow-xs flex items-center justify-center gap-2",
+                loading ? "opacity-80" : "bg-brand hover:bg-brand/90 text-white"
               )}
               aria-busy={loading}
             >
-              <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 skew-x-[-20deg]" />
               {loading ? (
                 <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Sintonizando IA...
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                  <span>Sintonizando IA...</span>
                 </>
               ) : (
                 <>
-                  <Zap className="h-4 w-4 mr-2 group-hover:animate-pulse" />
-                  GERAR COM INTELIGÊNCIA
+                  <Sparkles className="h-4 w-4 mr-1 text-white" />
+                  <span>Gerar com Inteligência Artificial</span>
                 </>
               )}
             </Button>
