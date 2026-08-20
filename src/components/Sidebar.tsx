@@ -98,8 +98,8 @@ export const Sidebar = () => {
             {isExpanded ? (
               <>
                 <Link to="/" className="flex items-center gap-2.5 min-w-0 group">
-                  <div className="h-9 w-9 rounded-lg bg-card/60 border border-border/70 p-1 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-2xs">
-                    <NexusIcon size={24} className="h-6 w-6" />
+                  <div className="h-9 w-9 rounded-lg bg-card border border-border/80 p-1 flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-2xs">
+                    <NexusIcon size={28} className="w-7 h-7" />
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className="font-bold text-sm text-foreground tracking-tight truncate leading-tight group-hover:text-brand transition-colors">
@@ -121,10 +121,10 @@ export const Sidebar = () => {
             ) : (
               <button
                 onClick={toggleSidebar}
-                className="h-10 w-10 rounded-lg bg-card/60 hover:bg-muted/40 border border-border/70 p-1.5 flex items-center justify-center text-brand transition-all shadow-2xs group"
+                className="h-10 w-10 rounded-lg bg-card hover:bg-muted/50 border border-border/80 p-1 flex items-center justify-center transition-all shadow-2xs group"
                 title="Expandir menu lateral"
               >
-                <NexusIcon size={26} className="h-6.5 w-6.5 group-hover:scale-105 transition-transform" />
+                <NexusIcon size={32} className="w-8 h-8 group-hover:scale-105 transition-transform" />
               </button>
             )}
           </div>

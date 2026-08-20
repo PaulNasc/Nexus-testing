@@ -16,7 +16,7 @@ export const NexusIcon: React.FC<{ size?: number; className?: string }> = ({
 }) => {
   return (
     <img
-      src="/img/Print_Transparent.svg"
+      src="/img/nexus-icon.svg"
       alt="Nexus Testing"
       width={size}
       height={size}
@@ -24,7 +24,6 @@ export const NexusIcon: React.FC<{ size?: number; className?: string }> = ({
       style={{ width: `${size}px`, height: `${size}px` }}
       loading="eager"
       onError={(e) => {
-        // Fallback para /nexus-logo.svg se necessário
         (e.target as HTMLImageElement).src = '/nexus-logo.svg';
       }}
     />
