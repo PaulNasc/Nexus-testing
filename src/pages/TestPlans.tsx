@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { 
   Plus, Search, ListFilter, ArrowUpDown, Edit, Trash2, 
   Sparkles, Download, Calendar, FileText, FileSpreadsheet, 
-  FileCode2, Copy, FileCheck2, Table 
+  FileCode2, Copy, FileCheck2, Table, AlertTriangle, 
+  FlaskConical, Play, Bug, ShieldAlert 
 } from 'lucide-react';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -991,115 +992,128 @@ export const TestPlans = () => {
           setLinkedDetails(null);
         }
       }}>
-        <AlertDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-auto-hide">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir plano de teste?</AlertDialogTitle>
+        <AlertDialogContent className="max-w-lg max-h-[85vh] overflow-y-auto scrollbar-auto-hide rounded-xl bg-card border border-border/80 p-6 shadow-xl space-y-4">
+          <AlertDialogHeader className="pb-3 border-b border-border/40 text-left">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center justify-center text-destructive shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <AlertDialogTitle className="text-base font-bold text-foreground tracking-tight">
+                  Excluir Plano de Teste?
+                </AlertDialogTitle>
+                {planToDelete && (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    PT-{String(planToDelete.sequence || 0).padStart(3, '0')} • {planToDelete.title}
+                  </p>
+                )}
+              </div>
+            </div>
           </AlertDialogHeader>
 
-          {/* Conteúdo em div ao invés de AlertDialogDescription para evitar nesting inválido */}
-          <div className="text-sm text-muted-foreground space-y-3 min-w-0">
-            {linkedCounts == null && <span>Verificando dependências...</span>}
+          <div className="text-xs text-muted-foreground space-y-3">
+            {linkedCounts == null && <span>Verificando dependências no banco de dados...</span>}
 
             {linkedCounts && (linkedCounts.testCaseCount > 0 || linkedCounts.executionCount > 0 || (linkedCounts.defectCount || 0) > 0) && (
-              <div className="space-y-3">
-                <div className="text-sm font-medium text-amber-600">
-                  ⚠️ Este plano possui vínculos que impedem a exclusão:
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3.5 space-y-3">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  <span>Este plano possui vínculos que impedem a exclusão:</span>
                 </div>
 
-                {/* Resumo das contagens */}
-                <div className="flex flex-wrap gap-2 text-xs">
+                {/* Resumo das contagens em chips */}
+                <div className="flex flex-wrap gap-2 pt-0.5">
                   {linkedCounts.testCaseCount > 0 && (
-                    <Badge variant="secondary" className="bg-blue-50 text-blue-700">
-                      {linkedCounts.testCaseCount} caso(s)
-                    </Badge>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold">
+                      <FlaskConical className="h-3.5 w-3.5" />
+                      <span>{linkedCounts.testCaseCount} caso(s) de teste</span>
+                    </div>
                   )}
                   {linkedCounts.executionCount > 0 && (
-                    <Badge variant="secondary" className="bg-green-50 text-green-700">
-                      {linkedCounts.executionCount} execução(ões)
-                    </Badge>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                      <Play className="h-3.5 w-3.5" />
+                      <span>{linkedCounts.executionCount} execução(ões)</span>
+                    </div>
                   )}
                   {(linkedCounts.defectCount || 0) > 0 && (
-                    <Badge variant="secondary" className="bg-red-50 text-red-700">
-                      {linkedCounts.defectCount} defeito(s)
-                    </Badge>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
+                      <Bug className="h-3.5 w-3.5" />
+                      <span>{linkedCounts.defectCount} defeito(s)</span>
+                    </div>
                   )}
                 </div>
 
-                {/* Lista de Casos de Teste */}
-                {linkedDetails && linkedDetails.testCases.length > 0 && (
-                  <div className="border rounded p-2 bg-muted/30 w-full overflow-hidden">
-                    <div className="text-xs font-medium mb-1 text-blue-700">Casos de Teste:</div>
-                    <div className="text-xs space-y-0.5 max-h-20 overflow-y-auto">
-                      {linkedDetails.testCases.map(tc => (
-                        <div key={tc.id} className="truncate">
-                          • CT-{String(tc.sequence || 0).padStart(3, '0')}: {tc.title}
-                        </div>
-                      ))}
-                      {linkedCounts.testCaseCount > linkedDetails.testCases.length && (
-                        <div className="text-muted-foreground italic">
-                          ... e mais {linkedCounts.testCaseCount - linkedDetails.testCases.length} caso(s)
-                        </div>
-                      )}
+                {/* Lista de Itens Vinculados */}
+                <div className="rounded-md border border-border/60 bg-background/50 p-2.5 space-y-2 max-h-36 overflow-y-auto scrollbar-auto-hide">
+                  {linkedDetails && linkedDetails.testCases.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="text-[11px] font-bold text-cyan-400 flex items-center gap-1">
+                        <FlaskConical className="h-3 w-3" /> Casos de Teste Vinculados:
+                      </div>
+                      <div className="space-y-0.5 pl-4">
+                        {linkedDetails.testCases.map(tc => (
+                          <div key={tc.id} className="text-xs text-foreground/90 truncate">
+                            • CT-{String(tc.sequence || 0).padStart(3, '0')}: {tc.title}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Lista de Execuções */}
-                {linkedDetails && linkedDetails.executions.length > 0 && (
-                  <div className="border rounded p-2 bg-muted/30 w-full overflow-hidden">
-                    <div className="text-xs font-medium mb-1 text-green-700">Execuções:</div>
-                    <div className="text-xs space-y-0.5 max-h-20 overflow-y-auto">
-                      {linkedDetails.executions.map(ex => (
-                        <div key={ex.id} className="truncate">
-                          • EXE-{String(ex.sequence || 0).padStart(3, '0')}: {ex.status}
-                        </div>
-                      ))}
-                      {linkedCounts.executionCount > linkedDetails.executions.length && (
-                        <div className="text-muted-foreground italic">
-                          ... e mais {linkedCounts.executionCount - linkedDetails.executions.length} execução(ões)
-                        </div>
-                      )}
+                  {linkedDetails && linkedDetails.executions.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-border/40">
+                      <div className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                        <Play className="h-3 w-3" /> Execuções Registradas:
+                      </div>
+                      <div className="space-y-0.5 pl-4">
+                        {linkedDetails.executions.map(ex => (
+                          <div key={ex.id} className="text-xs text-foreground/90 truncate">
+                            • EXE-{String(ex.sequence || 0).padStart(3, '0')}: {ex.status}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Lista de Defeitos */}
-                {linkedDetails && linkedDetails.defects.length > 0 && (
-                  <div className="border rounded p-2 bg-muted/30 w-full overflow-hidden">
-                    <div className="text-xs font-medium mb-1 text-red-700">Defeitos:</div>
-                    <div className="text-xs space-y-0.5 max-h-20 overflow-y-auto">
-                      {linkedDetails.defects.map(d => (
-                        <div key={d.id} className="truncate">
-                          • {d.title} ({d.status}{d.severity ? `, ${d.severity}` : ''})
-                        </div>
-                      ))}
-                      {(linkedCounts.defectCount || 0) > linkedDetails.defects.length && (
-                        <div className="text-muted-foreground italic">
-                          ... e mais {(linkedCounts.defectCount || 0) - linkedDetails.defects.length} defeito(s)
-                        </div>
-                      )}
+                  {linkedDetails && linkedDetails.defects.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-border/40">
+                      <div className="text-[11px] font-bold text-rose-400 flex items-center gap-1">
+                        <Bug className="h-3 w-3" /> Defeitos Vinculados:
+                      </div>
+                      <div className="space-y-0.5 pl-4">
+                        {linkedDetails.defects.map(d => (
+                          <div key={d.id} className="text-xs text-foreground/90 truncate">
+                            • {d.title} ({d.status})
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-
-                <div className="text-xs text-muted-foreground border-t pt-2">
-                  Remova todos os vínculos acima antes de excluir o plano para manter a integridade dos dados.
+                  )}
                 </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Remova ou desvincule todos os itens acima antes de excluir o plano para garantir a consistência e rastreabilidade dos dados.
+                </p>
               </div>
             )}
 
             {linkedCounts && linkedCounts.testCaseCount === 0 && linkedCounts.executionCount === 0 && (linkedCounts.defectCount || 0) === 0 && (
-              <div>Esta ação não pode ser desfeita. O plano será removido permanentemente. O código {planToDelete?.sequence ? `PT-${String(planToDelete.sequence).padStart(3, '0')}` : 'deste plano'} poderá ser reutilizado.</div>
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3.5 text-xs text-muted-foreground leading-relaxed">
+                Esta ação é irreversível. O plano de teste será permanentemente excluído do projeto e seu identificador {planToDelete?.sequence ? `PT-${String(planToDelete.sequence).padStart(3, '0')}` : ''} ficará liberado.
+              </div>
             )}
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+
+          <AlertDialogFooter className="pt-3 border-t border-border/40 flex items-center justify-end gap-2">
+            <AlertDialogCancel className="text-xs h-8.5 px-4 rounded-md border-border/70 font-medium hover:bg-muted/60 m-0">
+              Cancelar
+            </AlertDialogCancel>
             {linkedCounts && linkedCounts.testCaseCount === 0 && linkedCounts.executionCount === 0 && (linkedCounts.defectCount || 0) === 0 && planToDelete && (
               <AlertDialogAction
                 onClick={() => handleDelete(planToDelete.id)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="text-xs h-8.5 px-4 rounded-md bg-destructive hover:bg-destructive/90 text-white font-semibold shadow-xs"
               >
-                Excluir
+                Confirmar Exclusão
               </AlertDialogAction>
             )}
           </AlertDialogFooter>
