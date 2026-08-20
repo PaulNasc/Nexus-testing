@@ -48,8 +48,8 @@ export default function Register() {
         {/* Logo + Title */}
         <div className="text-center mb-6">
           <div className="flex flex-col items-center justify-center mb-2">
-            <div className="h-14 w-14 rounded-2xl bg-brand/10 border border-brand/25 flex items-center justify-center mb-3 shadow-lg shadow-brand/10">
-              <NexusIcon size={34} />
+            <div className="h-16 w-16 rounded-2xl bg-card/80 border border-border/80 p-2 flex items-center justify-center mb-3 shadow-lg shadow-black/20 backdrop-blur-sm">
+              <NexusIcon size={44} />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Nexus Testing</h1>
             <p className="text-xs text-muted-foreground mt-1">Crie sua conta para começar</p>

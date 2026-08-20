@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import KrigzisLogo from '@/components/branding/KrigzisLogo';
+import { NexusIcon } from '@/components/branding/NexusLogo';
 import { ExternalLink, GitBranch, Server, Cpu, Calendar, Shield, Sparkles, FileText, Play, BarChart3, Users, Bug, CheckCircle } from 'lucide-react';
 
 const SINGLE_TENANT = String((import.meta as any).env?.VITE_SINGLE_TENANT ?? 'true') === 'true';
@@ -51,7 +51,9 @@ export const About = () => {
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-8">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <KrigzisLogo size={36} className="h-9 w-9 shrink-0" />
+        <div className="h-12 w-12 rounded-xl bg-card/80 border border-border/80 p-1.5 flex items-center justify-center shrink-0 shadow-xs">
+          <NexusIcon size={32} />
+        </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Nexus Testing</h1>
           <p className="text-sm text-muted-foreground">Sistema de Gerenciamento de Testes de Software</p>
