@@ -518,83 +518,88 @@ export const TestPlans = () => {
   }
 
   return (
-    <div ref={containerRef} className="flex-1 space-y-6 p-6">
+    <div ref={containerRef} className="flex-1 space-y-5 p-6 animate-page-enter">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/40">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Planos de Teste</h1>
-          <p className="text-sm text-muted-foreground">Gerencie seus planos de teste</p>
+          <h1 className="text-xl font-bold text-foreground tracking-tight">Planos de Teste</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Gerencie seus planos de teste, escopos e estratégias de validação</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 shrink-0">
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
+            className="h-9 px-3 rounded-lg border-brand/30 bg-brand/5 hover:bg-brand/10 text-brand font-semibold text-xs gap-1.5 shadow-2xs"
             title="Gerar Plano com IA"
             disabled={!currentProject || currentProject.status !== 'active'}
             onClick={() => setShowAIModal(true)}
           >
-            <Sparkles className="h-4 w-4 text-amber-400" />
+            <Sparkles className="h-3.5 w-3.5 text-brand" />
+            <span className="hidden sm:inline">Gerar com IA</span>
           </Button>
-          <StandardButton 
-          variant="brand"
-          onClick={() => {
-            setShowForm(true);
-            setEditingPlan(null);
-            const params = new URLSearchParams(searchParams);
-            params.set('modal', 'plan:new');
-            params.delete('id');
-            setSearchParams(params);
-          }}
-          disabled={!currentProject || currentProject.status !== 'active'}
-          title={!currentProject ? 'Selecione um projeto ativo para criar planos' : (currentProject.status !== 'active' ? 'Projeto não ativo — criação desabilitada' : undefined)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Plano de Teste
-        </StandardButton>
+          
+          <Button
+            size="sm"
+            className="h-9 px-4 rounded-lg bg-brand hover:bg-brand/90 text-white font-semibold text-xs gap-1.5 shadow-xs transition-all active:scale-[0.98]"
+            onClick={() => {
+              setShowForm(true);
+              setEditingPlan(null);
+              const params = new URLSearchParams(searchParams);
+              params.set('modal', 'plan:new');
+              params.delete('id');
+              setSearchParams(params);
+            }}
+            disabled={!currentProject || currentProject.status !== 'active'}
+            title={!currentProject ? 'Selecione um projeto ativo para criar planos' : (currentProject.status !== 'active' ? 'Projeto não ativo — criação desabilitada' : undefined)}
+          >
+            <Plus className="h-4 w-4" />
+            <span>Novo Plano de Teste</span>
+          </Button>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2">
+      {/* Toolbar / Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
         <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
             value={searchTerm}
             onChange={(e) => handleSearchTermChange(e.target.value)}
-            placeholder="Buscar por número, título ou descrição"
-            className="pl-9 h-9 bg-muted/20 border-border/60"
+            placeholder="Buscar por número, título ou escopo..."
+            className="pl-9 h-8.5 text-xs bg-card/60 border-border/70 rounded-lg focus:bg-background focus:border-brand/40 shadow-2xs transition-all"
           />
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 overflow-x-auto pb-1 sm:pb-0">
           <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-3 border border-border/60 hover:border-border font-normal">
-                <ArrowUpDown className="h-3.5 w-3.5 shrink-0" />
-                <span className="hidden sm:inline text-sm">Ordenar</span>
+              <Button variant="outline" size="sm" className="h-8.5 gap-1.5 px-3 rounded-lg border-border/70 bg-card/60 hover:bg-muted/60 text-xs font-semibold shadow-2xs">
+                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span>Ordenar</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="text-xs rounded-xl border-border/70 shadow-lg">
               <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('desc'); }}>ID (maior primeiro)</DropdownMenuItem>
               <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('asc'); }}>ID (menor primeiro)</DropdownMenuItem>
               <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('desc'); }}>Data (mais recente)</DropdownMenuItem>
               <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('asc'); }}>Data (mais antiga)</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className={`h-9 gap-1.5 px-3 border font-normal ${
+              <Button variant="outline" size="sm" className={cn(
+                "h-8.5 gap-1.5 px-3 rounded-lg border text-xs font-semibold shadow-2xs transition-colors",
                 filterStatus !== 'all'
-                  ? 'border-brand/50 text-brand bg-brand/5 hover:bg-brand/10'
-                  : 'border-border/60 hover:border-border'
-              }`}>
+                  ? 'border-brand/40 text-brand bg-brand/5 hover:bg-brand/10'
+                  : 'border-border/70 bg-card/60 hover:bg-muted/60 text-foreground'
+              )}>
                 <ListFilter className="h-3.5 w-3.5 shrink-0" />
-                <span className="hidden sm:inline text-sm">
-                  {filterStatus === 'all' ? 'Todos' : getLabelFor(filterStatus)}
-                </span>
+                <span>{filterStatus === 'all' ? 'Status: Todos' : getLabelFor(filterStatus)}</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="text-xs rounded-xl border-border/70 shadow-lg">
               <DropdownMenuItem onClick={() => setFilterStatus('all')}>Todos</DropdownMenuItem>
               <DropdownMenuSeparator />
               {options.map(opt => (
@@ -602,34 +607,23 @@ export const TestPlans = () => {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
           {plans.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 gap-1.5 px-3 border border-border/60 hover:border-border font-normal">
-                  <Download className="h-3.5 w-3.5 shrink-0" />
-                  <span className="hidden sm:inline text-sm">Exportar</span>
+                <Button variant="outline" size="sm" className="h-8.5 gap-1.5 px-3 rounded-lg border-border/70 bg-card/60 hover:bg-muted/60 text-xs font-semibold shadow-2xs">
+                  <Download className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span>Exportar</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleExport('csv')}>
-                  📁 CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('excel')}>
-                  📊 Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('json')}>
-                  📄 JSON
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                  📋 PDF
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="text-xs rounded-xl border-border/70 shadow-lg">
+                <DropdownMenuItem onClick={() => handleExport('csv')}>📁 CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('excel')}>📊 Excel</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('json')}>📄 JSON</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('pdf')}>📋 PDF</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleCopy('txt')}>
-                  📋 Texto
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleCopy('md')}>
-                  📝 Markdown
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleCopy('txt')}>📋 Copiar Texto</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleCopy('md')}>📝 Copiar Markdown</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -647,69 +641,71 @@ export const TestPlans = () => {
                 return (
                 <Card
                   key={plan.id}
-                  className="border border-border/50 cursor-pointer card-hover flex flex-col"
+                  className="rounded-xl border border-border/70 bg-card/60 hover:border-brand/40 hover:shadow-md transition-all cursor-pointer flex flex-col p-4 space-y-3"
                   onClick={() => handleViewDetails(plan)}
                 >
-                  <CardHeader className="p-4 pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
-                          {`PT-${String(plan.sequence ?? '').padStart(3, '0')}`}
-                        </span>
-                        <CardTitle className="text-sm font-semibold line-clamp-2 leading-snug min-w-0">
-                          {plan.title}
-                        </CardTitle>
-                      </div>
-                      {Boolean(plan.generated_by_ai) && (
-                        <span title="Gerado por IA"><Sparkles className="h-3.5 w-3.5 text-amber-400 flex-shrink-0 mt-0.5" /></span>
-                      )}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[11px] font-mono font-bold bg-brand/10 text-brand px-2 py-0.5 rounded-md border border-brand/20 shrink-0">
+                        {`PT-${String(plan.sequence ?? '').padStart(3, '0')}`}
+                      </span>
+                      <h3 className="text-xs font-bold text-foreground truncate leading-snug">
+                        {plan.title}
+                      </h3>
                     </div>
-                    <div className="mt-1.5">
-                      <StatusDot status={plan.status} label={getLabelFor(plan.status)} />
+                    {Boolean(plan.generated_by_ai) && (
+                      <span title="Gerado por IA"><Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" /></span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <StatusDot status={plan.status} label={getLabelFor(plan.status)} />
+                    <ProjectDisplayField projectId={plan.project_id} />
+                  </div>
+
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed flex-1">
+                    {plan.description || 'Sem descrição cadastrada.'}
+                  </p>
+
+                  {/* Progress bar */}
+                  <div className="space-y-1 pt-1 border-t border-border/40">
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span className="font-medium">Progresso</span>
+                      <span className="font-semibold">{stats ? `${stats.execs}/${stats.cases} casos (${pct}%)` : '—'}</span>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0 flex flex-col flex-1">
-                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-                      {plan.description}
-                    </p>
-                    {/* Progress */}
-                    <div className="mb-3 space-y-1">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Progresso</span>
-                        <span>{stats ? `${stats.execs}/${stats.cases} casos` : '—'}</span>
-                      </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${pct}%`, backgroundColor: pct > 0 ? (currentProject?.color || 'hsl(var(--brand))') : undefined }}
-                        />
-                      </div>
+                    <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: pct > 0 ? (currentProject?.color || 'hsl(var(--brand))') : undefined }}
+                      />
                     </div>
-                    <div className="mt-auto flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
-                        {formatLocalDate(plan.created_at)}
-                      </div>
-                      <UserAvatar userId={plan.user_id} />
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
+                      <Calendar className="h-3 w-3" />
+                      {formatLocalDate(plan.created_at)}
                     </div>
-                  </CardContent>
+                    <UserAvatar userId={plan.user_id} />
+                  </div>
                 </Card>
               );
               }) : (
-                <div className="col-span-full text-center py-12">
-                  <p className="text-muted-foreground">Nenhum resultado encontrado com os filtros atuais.</p>
+                <div className="col-span-full text-center py-12 border border-dashed border-border/70 rounded-xl bg-card/30">
+                  <p className="text-xs font-medium text-muted-foreground">Nenhum plano encontrado com os filtros selecionados.</p>
                 </div>
               )}
             </div>
           ) : (
-            // Lista em formato tabela
+            // Lista em formato tabela executiva
             <div className="space-y-2">
               {filteredAndSortedPlans.length > 0 ? (
-                <div ref={listCardRef} className="bg-card border border-border rounded-lg overflow-hidden">
+                <div ref={listCardRef} className="bg-card/40 border border-border/70 rounded-xl overflow-hidden shadow-2xs">
                   {/* Header da tabela */}
-                  <div ref={listHeaderRef} className="grid grid-cols-[80px_4fr_2fr_2fr_2fr_80px_100px_72px] items-center gap-3 px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <div ref={listHeaderRef} className="grid grid-cols-[84px_4fr_2fr_1.8fr_2fr_88px_110px_72px] items-center gap-3 px-4 py-3 bg-muted/40 border-b border-border/70 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                     <div>ID</div>
-                    <div>Título</div>
+                    <div>Título & Contexto</div>
                     <div>Projeto</div>
                     <div>Status</div>
                     <div>Progresso</div>
@@ -719,32 +715,36 @@ export const TestPlans = () => {
                   </div>
 
                   {/* Linhas da tabela */}
-                  <div className="divide-y divide-border/60">
+                  <div className="divide-y divide-border/40">
                     {paginatedPlans.map((plan) => {
                       const pct = planProgress(plan.id);
                       const stats = planStats[plan.id];
                       return (
                         <div
                           key={plan.id}
-                          className="grid grid-cols-[80px_4fr_2fr_2fr_2fr_80px_100px_72px] items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                          className="grid grid-cols-[84px_4fr_2fr_1.8fr_2fr_88px_110px_72px] items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors cursor-pointer group"
                           onClick={() => handleViewDetails(plan)}
                         >
                           {/* ID */}
                           <div>
-                            <span className="text-xs font-mono bg-brand/10 text-brand px-2 py-0.5 rounded">
+                            <span className="text-[11px] font-mono font-bold bg-brand/10 text-brand px-2 py-0.5 rounded-md border border-brand/20 inline-block">
                               {`PT-${String(plan.sequence ?? '').padStart(3, '0')}`}
                             </span>
                           </div>
 
                           {/* Título + desc */}
-                          <div className="min-w-0">
+                          <div className="min-w-0 pr-2">
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-sm font-medium text-foreground truncate leading-tight">{plan.title}</span>
+                              <span className="text-xs font-bold text-foreground group-hover:text-brand transition-colors truncate leading-tight">
+                                {plan.title}
+                              </span>
                               {Boolean(plan.generated_by_ai) && (
-                                <span title="Gerado por IA"><Sparkles className="h-3 w-3 text-amber-400 flex-shrink-0" /></span>
+                                <span title="Gerado por IA"><Sparkles className="h-3 w-3 text-amber-400 shrink-0" /></span>
                               )}
                             </div>
-                            <div className="text-xs text-muted-foreground truncate mt-0.5">{plan.description}</div>
+                            <div className="text-[11px] text-muted-foreground truncate mt-0.5 leading-normal">
+                              {plan.description || 'Sem descrição'}
+                            </div>
                           </div>
 
                           {/* Projeto */}
@@ -758,12 +758,12 @@ export const TestPlans = () => {
                           </div>
 
                           {/* Progress bar */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="space-y-1 pr-2">
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
                               <span>{stats ? `${stats.execs}/${stats.cases}` : '—'}</span>
-                              <span>{stats ? `${pct}%` : ''}</span>
+                              <span className="font-semibold">{stats ? `${pct}%` : ''}</span>
                             </div>
-                            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-muted/60 rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full transition-all"
                                 style={{ width: `${pct}%`, backgroundColor: pct > 0 ? (currentProject?.color || 'hsl(var(--brand))') : undefined }}
@@ -777,20 +777,26 @@ export const TestPlans = () => {
                           </div>
 
                           {/* Data */}
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground font-medium">
                             {formatLocalDate(plan.created_at)}
                           </div>
 
                           {/* Ações */}
-                          <div className="flex items-center gap-0.5 justify-end">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                          <div className="flex items-center gap-1 justify-end">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7.5 w-7.5 p-0 rounded-md hover:bg-muted/60"
                               onClick={(e) => { e.stopPropagation(); handleEdit(plan); }}
                               disabled={!currentProject || currentProject.status !== 'active'}
                               title={!currentProject ? 'Selecione um projeto ativo para editar planos' : (currentProject.status !== 'active' ? 'Projeto não ativo — edição desabilitada' : undefined)}
                             >
                               <Edit className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7.5 w-7.5 p-0 rounded-md text-destructive hover:text-destructive hover:bg-destructive/10"
                               onClick={(e) => { e.stopPropagation(); handleRequestDelete(plan); }}
                               disabled={!currentProject || isProjectInactive}
                               title={!currentProject ? 'Selecione um projeto ativo para excluir planos' : (isProjectInactive ? 'Projeto não ativo — exclusão desabilitada' : undefined)}
@@ -804,23 +810,23 @@ export const TestPlans = () => {
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">Nenhum resultado encontrado com os filtros atuais.</p>
+                <div className="text-center py-12 border border-dashed border-border/70 rounded-xl bg-card/30">
+                  <p className="text-xs font-medium text-muted-foreground">Nenhum resultado encontrado com os filtros atuais.</p>
                 </div>
               )}
             </div>
           )
         ) : (
-          <div className="text-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              Nenhum plano encontrado
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              Comece criando seu primeiro plano de teste
-            </p>
-            <StandardButton 
-              variant="brand"
+          <div className="text-center py-16 px-6 border-2 border-dashed border-border/70 rounded-2xl bg-card/30 max-w-md mx-auto space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-muted/40 flex items-center justify-center mx-auto text-muted-foreground">
+              <FileText className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Nenhum plano de teste cadastrado</h3>
+              <p className="text-xs text-muted-foreground mt-1">Comece criando seu primeiro plano para estruturar sua suíte de testes.</p>
+            </div>
+            <Button 
+              className="h-9 px-5 rounded-lg bg-brand hover:bg-brand/90 text-white font-semibold text-xs gap-1.5 shadow-xs"
               onClick={() => {
                 setShowForm(true);
                 const params = new URLSearchParams(searchParams);
@@ -831,12 +837,64 @@ export const TestPlans = () => {
               disabled={!currentProject || currentProject.status !== 'active'}
               title={!currentProject ? 'Selecione um projeto ativo para criar planos' : (currentProject.status !== 'active' ? 'Projeto não ativo — criação desabilitada' : undefined)}
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Criar Primeiro Plano
-            </StandardButton>
+              <Plus className="h-4 w-4" />
+              <span>Criar Primeiro Plano</span>
+            </Button>
           </div>
         )}
       </div>
+
+      {/* Pagination controls */}
+      {plans.length > 0 && (
+        <div ref={paginationRef} className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-border/40">
+          <div className="text-xs font-medium text-muted-foreground">
+            {(() => {
+              const start = (currentPage - 1) * pageSize + 1;
+              const end = Math.min(currentPage * pageSize, totalItems);
+              return `Mostrando ${start}–${end} de ${totalItems} plano(s)`;
+            })()}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Itens por página:</label>
+              <select
+                className="h-8 text-xs rounded-lg border border-border/70 bg-card/60 px-2 font-semibold focus:outline-none"
+                value={pageSize}
+                onChange={(e) => {
+                  const next = parseInt(e.target.value, 10) || 9;
+                  setPageSize(next);
+                  setPage(1);
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={9}>9</option>
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage <= 1}
+                className="h-8 text-xs font-semibold rounded-lg border-border/70 bg-card/60 hover:bg-muted/60 px-3"
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
+                className="h-8 text-xs font-semibold rounded-lg border-border/70 bg-card/60 hover:bg-muted/60 px-3"
+              >
+                Próxima
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal do Formulário */}
       <Dialog open={showForm} onOpenChange={(open) => {
@@ -857,14 +915,16 @@ export const TestPlans = () => {
         }
         setSearchParams(params);
       }}>
-        <DialogContent className={cn(editingPlan ? "max-w-2xl" : "max-w-4xl", "max-h-[90vh] overflow-hidden flex flex-col scrollbar-auto-hide")}>
-          <DialogHeader className="px-6 pt-6 shrink-0">
-            <DialogTitle>{editingPlan ? 'Editar Plano de Teste' : 'Novo Plano de Teste'}</DialogTitle>
-            <DialogDescription>
+        <DialogContent className={cn(editingPlan ? "max-w-2xl" : "max-w-4xl", "max-h-[90vh] overflow-hidden flex flex-col rounded-xl bg-card border border-border/80 p-0 shadow-xl scrollbar-auto-hide")}>
+          <DialogHeader className="px-6 pt-6 pb-2 shrink-0 border-b border-border/40">
+            <DialogTitle className="text-base font-bold text-foreground">
+              {editingPlan ? 'Editar Plano de Teste' : 'Novo Plano de Teste'}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
               {editingPlan ? 'Ajuste as informações do plano selecionado.' : 'Defina os dados do plano e adicione casos de teste vinculados se desejar.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6">
+          <div className="flex-1 overflow-y-auto scrollbar-auto-hide px-6 py-4">
             {editingPlan ? (
               <TestPlanForm
                 initialData={editingPlan}
@@ -880,58 +940,6 @@ export const TestPlans = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Pagination controls */}
-      {plans.length > 0 && (
-        <div ref={paginationRef} className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
-          <div className="text-sm text-muted-foreground mb-2 sm:mb-0">
-          {(() => {
-            const start = (currentPage - 1) * pageSize + 1;
-            const end = Math.min(currentPage * pageSize, totalItems);
-            return `Mostrando ${start}–${end} de ${totalItems}`;
-          })()}
-        </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-              <label className="text-sm text-muted-foreground whitespace-nowrap">Itens por página:</label>
-              <select
-                className="border rounded-md px-2 py-1 bg-background w-16 sm:w-auto"
-                value={pageSize}
-                onChange={(e) => {
-                  const next = parseInt(e.target.value, 10) || 9;
-                  setPageSize(next);
-                  setPage(1);
-                }}
-              >
-                <option value={5}>5</option>
-                <option value={9}>9</option>
-                <option value={12}>12</option>
-                <option value={24}>24</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-              <StandardButton
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage <= 1}
-                className="flex-1 sm:flex-none"
-              >
-                Anterior
-              </StandardButton>
-              <StandardButton
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage >= totalPages}
-                className="flex-1 sm:flex-none"
-              >
-                Próxima
-              </StandardButton>
-            </div>
-          </div>
-        </div>
-      )}
 
       <DetailModal
         isOpen={showDetailModal}

@@ -10,39 +10,41 @@ interface ViewModeToggleProps {
 export const ViewModeToggle = ({ viewMode, onViewModeChange }: ViewModeToggleProps) => {
   return (
     <TooltipProvider>
-      <div className="flex rounded-md border border-border/60 overflow-hidden">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => onViewModeChange('cards')}
-              className={cn(
-                'h-9 w-9 flex items-center justify-center transition-colors',
-                viewMode === 'cards'
-                  ? 'bg-brand text-brand-foreground'
-                  : 'bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-              )}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent><p>Cards</p></TooltipContent>
-        </Tooltip>
-
+      <div className="inline-flex p-0.5 rounded-lg bg-card/60 border border-border/70 shadow-2xs">
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={() => onViewModeChange('list')}
               className={cn(
-                'h-9 w-9 flex items-center justify-center border-l border-border/60 transition-colors',
+                'h-7.5 px-2.5 flex items-center justify-center rounded-md text-xs font-medium transition-all gap-1.5',
                 viewMode === 'list'
-                  ? 'bg-brand text-brand-foreground'
-                  : 'bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                  ? 'bg-muted/80 text-foreground shadow-2xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
               )}
             >
               <LayoutList className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline text-xs">Lista</span>
             </button>
           </TooltipTrigger>
-          <TooltipContent><p>Lista</p></TooltipContent>
+          <TooltipContent><p>Visualização em Tabela</p></TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => onViewModeChange('cards')}
+              className={cn(
+                'h-7.5 px-2.5 flex items-center justify-center rounded-md text-xs font-medium transition-all gap-1.5',
+                viewMode === 'cards'
+                  ? 'bg-muted/80 text-foreground shadow-2xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline text-xs">Cards</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent><p>Visualização em Cards</p></TooltipContent>
         </Tooltip>
       </div>
     </TooltipProvider>
