@@ -58,10 +58,6 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 sm:p-6 relative select-none">
-      {/* ── Background Sutil ── */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--brand)/0.12),transparent_70%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_80%,hsl(var(--primary)/0.04),transparent_50%)] pointer-events-none" />
-
       <div className="relative w-full max-w-[420px] z-10 animate-page-enter">
         {/* ── Topo: Branding & Título ── */}
         <div className="text-center mb-6">
