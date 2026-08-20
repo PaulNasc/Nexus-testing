@@ -222,35 +222,73 @@ export const exportSupabaseData = async (
   }
 };
 
-// Exportar dados de tabela pré-formatados
+// Exportar dados tabulares gerais com suporte a CSV, Excel, JSON e PDF
 export const exportTableData = async (
-  data: Record<string, any>[], 
-  format: 'csv' | 'json' | 'excel', 
-  filename: string
+  data: ExportData | Record<string, any>[],
+  format: 'csv' | 'excel' | 'json' | 'pdf',
+  filename: string = 'export'
 ) => {
-  if (!data || data.length === 0) {
-    throw new Error('Nenhum dado para exportar');
+  let exportData: ExportData;
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      exportData = { headers: [], rows: [] };
+    } else {
+      const headers = Object.keys(data[0]);
+      const rows = data.map(item => headers.map(h => item[h]));
+      exportData = { headers, rows, title: filename };
+    }
+  } else {
+    exportData = data;
   }
-
-  if (format === 'json') {
-    exportToJSON(data, filename);
-    return;
-  }
-
-  // Para CSV e Excel, converter para formato tabular
-  const headers = Object.keys(data[0]);
-  const rows = data.map(item => headers.map(header => item[header]));
-
-  const exportData: ExportData = {
-    headers,
-    rows,
-    title: 'Dados Exportados'
-  };
 
   if (format === 'csv') {
     exportToCSV(exportData, filename);
   } else if (format === 'excel') {
     exportToExcel(exportData, filename);
+  } else if (format === 'json') {
+    const rawJson = Array.isArray(data)
+      ? data
+      : exportData.rows.map(r => {
+          const obj: Record<string, any> = {};
+          exportData.headers.forEach((h, i) => { obj[h] = r[i]; });
+          return obj;
+        });
+    exportToJSON(rawJson, filename);
+  } else if (format === 'pdf') {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const rowsHtml = exportData.rows.map(r => `<tr>${r.map(c => `<td>${String(c ?? '')}</td>`).join('')}</tr>`).join('');
+      const headersHtml = exportData.headers.map(h => `<th>${h}</th>`).join('');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${filename}</title>
+          <style>
+            @page { size: A4 landscape; margin: 12mm; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; color: #111; padding: 20px; }
+            h2 { font-size: 16px; margin: 0 0 4px; }
+            p { font-size: 11px; color: #666; margin: 0 0 16px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
+            th { background: #f5f5f5; font-weight: bold; font-size: 11px; }
+            tr:nth-child(even) { background: #fafafa; }
+          </style>
+        </head>
+        <body>
+          <h2>Nexus TCMS — ${filename.replace(/_/g, ' ')}</h2>
+          <p>Exportado em: ${new Date().toLocaleString('pt-BR')}</p>
+          <table>
+            <thead><tr>${headersHtml}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <script>window.onload = () => { window.print(); };</script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   }
 };
 

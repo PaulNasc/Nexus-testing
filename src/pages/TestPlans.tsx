@@ -8,7 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, ListFilter, ArrowUpDown, Edit, Trash2, Sparkles, Download, Calendar, FileText } from 'lucide-react';
+import { 
+  Plus, Search, ListFilter, ArrowUpDown, Edit, Trash2, 
+  Sparkles, Download, Calendar, FileText, FileSpreadsheet, 
+  FileCode2, Copy, FileCheck2, Table 
+} from 'lucide-react';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { cn, formatLocalDate } from '@/lib/utils';
@@ -434,23 +438,8 @@ export const TestPlans = () => {
         Criação: formatLocalDate(plan.created_at)
       }));
 
-      if (format === 'pdf') {
-        // Criar PDF simples sem dependências externas
-        const content = `Planos de Teste\nExportado em: ${new Date().toLocaleDateString('pt-BR')}\n\n` +
-          `ID\tTítulo\tProjeto\tStatus\tCriação\n` +
-          tableData.map(row => `${row.ID}\t${row["Título"]}\t${row.Projeto}\t${row.Status}\t${row.Criação}`).join('\n');
-        
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `planos_teste_${new Date().toISOString().split('T')[0]}.txt`;
-        link.click();
-        URL.revokeObjectURL(url);
-      } else {
-        const { exportTableData } = await import('../utils/export');
-        await exportTableData(tableData, format, `planos_teste_${new Date().toISOString().split('T')[0]}`);
-      }
+      const { exportTableData } = await import('../utils/export');
+      await exportTableData(tableData, format, `planos_teste_${new Date().toISOString().split('T')[0]}`);
 
       toast({
         title: 'Exportação realizada',
@@ -616,14 +605,32 @@ export const TestPlans = () => {
                   <span>Exportar</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="text-xs rounded-xl border-border/70 shadow-lg">
-                <DropdownMenuItem onClick={() => handleExport('csv')}>📁 CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('excel')}>📊 Excel</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('json')}>📄 JSON</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('pdf')}>📋 PDF</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleCopy('txt')}>📋 Copiar Texto</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleCopy('md')}>📝 Copiar Markdown</DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-52 text-xs rounded-xl border-border/70 shadow-lg p-1.5 space-y-0.5">
+                <DropdownMenuItem onClick={() => handleExport('csv')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+                  <Table className="h-4 w-4 text-cyan-400 shrink-0" />
+                  <span className="font-medium text-foreground">Exportar CSV (.csv)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('excel')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-400 shrink-0" />
+                  <span className="font-medium text-foreground">Exportar Excel (.xlsx)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('json')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+                  <FileCode2 className="h-4 w-4 text-amber-400 shrink-0" />
+                  <span className="font-medium text-foreground">Exportar JSON (.json)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('pdf')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+                  <FileText className="h-4 w-4 text-rose-400 shrink-0" />
+                  <span className="font-medium text-foreground">Imprimir / PDF (.pdf)</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1 border-border/40" />
+                <DropdownMenuItem onClick={() => handleCopy('txt')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+                  <Copy className="h-4 w-4 text-brand shrink-0" />
+                  <span className="font-medium text-foreground">Copiar em Texto</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleCopy('md')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+                  <FileCheck2 className="h-4 w-4 text-indigo-400 shrink-0" />
+                  <span className="font-medium text-foreground">Copiar em Markdown</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
