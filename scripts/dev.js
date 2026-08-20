@@ -52,6 +52,13 @@ console.log('\x1b[36m%s\x1b[0m', '═══════════════�
 console.log('\x1b[36m%s\x1b[0m', '           NEXUS TESTING - INICIANDO AMBIENTE DE DESENVOLVIMENTO      ');
 console.log('\x1b[36m%s\x1b[0m', '══════════════════════════════════════════════════════════════════════\n');
 
+const majorVersion = parseInt(process.versions.node.split('.')[0], 10);
+if (majorVersion < 18) {
+  console.error('\x1b[31m%s\x1b[0m', `\n[ERRO CRÍTICO] Você está executando com Node.js v${process.versions.node} (antigo).`);
+  console.error('\x1b[33m%s\x1b[0m', `O Nexus Testing e suas dependências nativas (better-sqlite3, Vite 6) requerem Node.js >= 18 (recomendado v22.23.0).`);
+  console.error('\x1b[36m%s\x1b[0m', `Para corrigir no seu Prompt de Comando (CMD), execute:\n  nvm use 22.23.0\nOu execute diretamente o arquivo: dev.bat\n`);
+}
+
 // 1. Iniciar API Backend
 console.log('\x1b[33m[SISTEMA]\x1b[0m Iniciando API Backend (Porta 4000)...');
 const apiProcess = spawn('node', ['server/index.js'], {
