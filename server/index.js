@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
@@ -1536,6 +1537,18 @@ function cleanupOldData() {
 cleanupOldData();
 // E a cada 24 horas
 setInterval(cleanupOldData, 24 * 60 * 60 * 1000);
+
+// ── Servir Frontend Compilado (Modo Produção / Standalone) ─────────────────
+const distDir = path.join(rootDir, 'dist');
+if (fsSync.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
+      return next();
+    }
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 app.use((error, _req, res, _next) => {
   logger.error(error);
