@@ -127,7 +127,7 @@ export default function ResetPassword() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     autoFocus
-                    className="pl-9.5 pr-10 h-10 text-xs bg-background/60 border-border/70 focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:border-brand rounded-md font-medium"
+                    className="pl-10 pr-10 h-10 text-xs bg-background/60 border-border/70 focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:border-brand rounded-md font-medium"
                   />
                   <button
                     type="button"
@@ -154,7 +154,7 @@ export default function ResetPassword() {
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     required
-                    className="pl-9.5 pr-10 h-10 text-xs bg-background/60 border-border/70 focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:border-brand rounded-md font-medium"
+                    className="pl-10 pr-10 h-10 text-xs bg-background/60 border-border/70 focus-visible:ring-1 focus-visible:ring-brand/40 focus-visible:border-brand rounded-md font-medium"
                   />
                   <button
                     type="button"
