@@ -1016,11 +1016,11 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
 
   return (<>
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0">
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0 rounded-xl bg-card border border-border/80 shadow-2xl">
         <DialogTitle className="sr-only">{getTypeLabel()} — {getItemTitle()}</DialogTitle>
 
         {/* Cabeçalho Fixo */}
-        <div className="p-6 pb-3 shrink-0 border-b border-border/40 bg-background">
+        <div className="p-6 pb-3 shrink-0 border-b border-border/40 bg-card">
           <div className="pr-8 flex flex-col md:flex-row md:items-start justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold text-foreground leading-tight flex items-center gap-3">
@@ -1454,7 +1454,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
         </div>{/* end relative scroll wrapper */}
 
         {/* Rodapé Fixo */}
-        <div className="p-6 pt-3 shrink-0 border-t border-border bg-background">
+        <div className="p-6 pt-3 shrink-0 border-t border-border/40 bg-card">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <ExportDropdown item={item} type={type} />
@@ -1466,7 +1466,7 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
                     disabled={imgCount === 0}
                     onClick={() => setCarouselOpen(true)}
                     title={imgCount > 0 ? `Ver ${imgCount} imagem${imgCount !== 1 ? 's' : ''} de referência` : 'Nenhuma imagem disponível'}
-                    className={`relative h-8 w-8 flex items-center justify-center rounded-md border transition-all ${
+                    className={`relative h-8 w-8 flex items-center justify-center rounded-lg border transition-all ${
                       imgCount > 0
                         ? 'border-brand/25 bg-brand/5 hover:bg-brand/15 hover:border-brand/50 cursor-pointer'
                         : 'border-border/40 bg-background/50 opacity-40 cursor-not-allowed'
@@ -1504,35 +1504,55 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
             </div>
             <div className="flex gap-2">
               {type === 'plan' && ('generated_by_ai' in item && Boolean(item.generated_by_ai)) && (
-                <Button onClick={openGenerateDialog} disabled={generating || isProjectInactive} title={isProjectInactive ? 'Projeto não ativo — geração desabilitada' : undefined}>
+                <Button 
+                  size="sm"
+                  onClick={openGenerateDialog} 
+                  disabled={generating || isProjectInactive} 
+                  title={isProjectInactive ? 'Projeto não ativo — geração desabilitada' : undefined}
+                  className="h-8.5 text-xs rounded-lg bg-brand hover:bg-brand/90 text-white font-semibold shadow-xs"
+                >
                   {generating ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Gerando...</>
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Gerando...</>
                   ) : (
-                    <><Sparkles className="h-4 w-4 mr-1" />Gerar Casos</>
+                    <><Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-300" />Gerar Casos</>
                   )}
                 </Button>
               )}
               {onEdit && (
-                <Button variant="outline" onClick={() => onEdit(item)} disabled={isProjectInactive} title={isProjectInactive ? 'Projeto não ativo — edição desabilitada' : undefined}>
-                  <Edit className="h-4 w-4 mr-1" />
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => onEdit(item)} 
+                  disabled={isProjectInactive} 
+                  title={isProjectInactive ? 'Projeto não ativo — edição desabilitada' : undefined}
+                  className="h-8.5 text-xs rounded-lg border-border/70 bg-card/60 hover:bg-muted/60 font-semibold"
+                >
+                  <Edit className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                   Editar
                 </Button>
               )}
               {onDelete && (
                 <Button
+                  size="sm"
                   variant={confirmDelete ? "destructive" : "outline"}
                   onClick={handleDelete}
                   disabled={isProjectInactive}
                   title={isProjectInactive ? 'Projeto não ativo — exclusão desabilitada' : undefined}
+                  className={cn(
+                    "h-8.5 text-xs rounded-lg font-semibold",
+                    confirmDelete 
+                      ? "bg-destructive text-white shadow-xs" 
+                      : "border-border/70 bg-card/60 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                  )}
                 >
-                  <Trash2 className="h-4 w-4 mr-1" />
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                   {confirmDelete ? 'Confirmar Exclusão' : 'Excluir'}
                 </Button>
               )}
             </div>
           </div>
         </div>
-          </DialogContent>
+      </DialogContent>
     </Dialog>
 
     {/* Modal de Carrossel de Imagens */}

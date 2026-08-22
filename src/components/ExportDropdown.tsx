@@ -1,6 +1,8 @@
-
 import { useState } from 'react';
-import { Download, Copy, FileText, FileImage, File } from 'lucide-react';
+import { 
+  Download, Copy, FileText, Table, 
+  FileSpreadsheet, FileCode2, FileCheck2, Loader2 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -26,13 +28,13 @@ export const ExportDropdown = ({ item, type }: ExportDropdownProps) => {
     try {
       await exportItem(item, type, format);
       toast({
-        title: "Sucesso",
-        description: `Item exportado como ${format.toUpperCase()}!`
+        title: "Exportação concluída",
+        description: `Item exportado com sucesso em formato ${format.toUpperCase()}!`
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Erro ao exportar item",
+        title: "Erro na exportação",
+        description: error.message || "Não foi possível exportar o item.",
         variant: "destructive"
       });
     } finally {
@@ -44,74 +46,66 @@ export const ExportDropdown = ({ item, type }: ExportDropdownProps) => {
     try {
       await copyToClipboard(item, type, format);
       toast({
-        title: "Sucesso",
-        description: `Conteúdo copiado como ${format.toUpperCase()}!`
+        title: "Copiado!",
+        description: `Conteúdo copiado em formato ${format.toUpperCase()}!`
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Erro ao copiar conteúdo",
+        title: "Erro ao copiar",
+        description: error.message || "Não foi possível copiar o conteúdo.",
         variant: "destructive"
       });
-    }
-  };
-
-  const getFormatIcon = (format: string) => {
-    switch (format) {
-      case 'pdf': return <FileImage className="h-4 w-4" />;
-      case 'word': return <File className="h-4 w-4" />;
-      default: return <FileText className="h-4 w-4" />;
     }
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" disabled={isExporting}>
-          <Download className="h-4 w-4 mr-1" />
-          Exportar
+        <Button 
+          variant="outline" 
+          size="sm" 
+          disabled={isExporting}
+          className="h-8.5 text-xs rounded-lg border-border/70 bg-card/60 hover:bg-muted/60 font-semibold gap-1.5 shadow-2xs"
+        >
+          {isExporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+          <span>Exportar</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <div className="px-2 py-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-          Exportar como:
-        </div>
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem onClick={() => handleExport('pdf')}>
-          {getFormatIcon('pdf')}
-          <span className="ml-2">PDF</span>
+      <DropdownMenuContent align="end" className="w-52 text-xs rounded-xl border-border/70 shadow-lg p-1.5 space-y-0.5">
+        <DropdownMenuItem onClick={() => handleExport('pdf')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+          <FileText className="h-4 w-4 text-rose-400 shrink-0" />
+          <span className="font-medium text-foreground">Documento PDF (.pdf)</span>
         </DropdownMenuItem>
         
-        <DropdownMenuItem onClick={() => handleExport('word')}>
-          {getFormatIcon('word')}
-          <span className="ml-2">Word</span>
+        <DropdownMenuItem onClick={() => handleExport('word')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+          <FileSpreadsheet className="h-4 w-4 text-blue-400 shrink-0" />
+          <span className="font-medium text-foreground">Documento Word (.doc)</span>
         </DropdownMenuItem>
         
-        <DropdownMenuItem onClick={() => handleExport('txt')}>
-          {getFormatIcon('txt')}
-          <span className="ml-2">TXT</span>
+        <DropdownMenuItem onClick={() => handleExport('txt')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+          <Table className="h-4 w-4 text-cyan-400 shrink-0" />
+          <span className="font-medium text-foreground">Texto Puro (.txt)</span>
         </DropdownMenuItem>
         
-        <DropdownMenuItem onClick={() => handleExport('md')}>
-          {getFormatIcon('md')}
-          <span className="ml-2">Markdown (.md)</span>
+        <DropdownMenuItem onClick={() => handleExport('md')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+          <FileCode2 className="h-4 w-4 text-amber-400 shrink-0" />
+          <span className="font-medium text-foreground">Markdown (.md)</span>
         </DropdownMenuItem>
         
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="my-1 border-border/40" />
         
-        <div className="px-2 py-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-          Copiar como:
-        </div>
-        
-        <DropdownMenuItem onClick={() => handleCopy('txt')}>
-          <Copy className="h-4 w-4" />
-          <span className="ml-2">Texto</span>
+        <DropdownMenuItem onClick={() => handleCopy('txt')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+          <Copy className="h-4 w-4 text-brand shrink-0" />
+          <span className="font-medium text-foreground">Copiar em Texto</span>
         </DropdownMenuItem>
         
-        <DropdownMenuItem onClick={() => handleCopy('md')}>
-          <Copy className="h-4 w-4" />
-          <span className="ml-2">Markdown</span>
+        <DropdownMenuItem onClick={() => handleCopy('md')} className="flex items-center gap-2.5 cursor-pointer py-1.5 px-2.5 rounded-lg">
+          <FileCheck2 className="h-4 w-4 text-indigo-400 shrink-0" />
+          <span className="font-medium text-foreground">Copiar em Markdown</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
