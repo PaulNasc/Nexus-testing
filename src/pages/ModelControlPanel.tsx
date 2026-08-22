@@ -785,28 +785,54 @@ export const ModelControlPanel = () => {
 
   return (
     <PermissionGuard requiredPermission="can_access_model_control">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="flex-1 space-y-6 p-6 animate-slide-up">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-foreground">Model Control Panel</h2>
-            <p className="text-muted-foreground">Gerenciamento de modelos e templates de IA</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+              <Bot className="h-6 w-6 text-brand" />
+              Painel de Modelos e IA
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Gerencie chaves de API, modelos de inteligência artificial, templates de prompt e testes de conectividade.
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={resetConfig} className="flex items-center gap-2">
-              <RefreshCcw className="h-4 w-4" /> Redefinir
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={resetConfig} className="h-9 text-xs border-border/70">
+              <RefreshCcw className="h-3.5 w-3.5 mr-1.5" /> Redefinir
             </Button>
-            <Button onClick={saveConfigToSupabase} className="flex items-center gap-2">
-              <Save className="h-4 w-4" /> Salvar
+            <Button size="sm" variant="brand" onClick={saveConfigToSupabase} className="h-9 text-xs">
+              <Save className="h-3.5 w-3.5 mr-1.5" /> Salvar Configurações
             </Button>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={v => { const val = v as any; setActiveTab(val); setOpenSections({ models: val === 'models', templates: val === 'templates', tests: val === 'tests' }); }}>
-          <TabsList className="bg-muted">
-            <TabsTrigger value="models">Modelos</TabsTrigger>
-            <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="tests">Testes</TabsTrigger>
-          </TabsList>
+          <div className="border-b border-border/60 pb-3">
+            <TabsList className="bg-muted/30 p-1 rounded-xl border border-border/60 h-auto flex flex-wrap gap-1">
+              <TabsTrigger 
+                value="models" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                Modelos de IA ({totalModelsCount})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="templates" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Templates de Prompt
+              </TabsTrigger>
+              <TabsTrigger 
+                value="tests" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                Diagnóstico e Testes
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* ═══════════════════════════════════════════════════════════════ */}
           {/* TAB: MODELOS                                                    */}

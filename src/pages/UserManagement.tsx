@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,10 +17,12 @@ import {
   Users, Loader2, Search, UserPlus, Trash2, ChevronDown, ChevronUp,
   Shield, UserCog, RefreshCcw, Check, X as XIcon, Mail, Crown,
   FileText, ClipboardCheck, Play, BarChart3, Download, Sparkles,
-  Zap, Settings, Link2, Bug, Activity, Eye, Lock, Clock,
+  Zap, Settings, Link2, Bug, Activity, Eye, Lock, Clock, Layers
 } from 'lucide-react';
 import { ActivityLogPanel } from '@/components/ActivityLogPanel';
 import { GroupsManagement } from '@/components/GroupsManagement';
+import { StandardButton } from '@/components/StandardButton';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 const SINGLE_TENANT = String(import.meta.env?.VITE_SINGLE_TENANT ?? 'true') === 'true';
 
@@ -62,7 +64,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
   viewer: 'bg-muted text-muted-foreground border-border',
 };
 
-// Permissões agrupadas por categoria — apenas as que existem no código
+// Permissões agrupadas por categoria
 const PERMISSION_GROUPS: Array<{
   key: string;
   label: string;
@@ -130,8 +132,6 @@ const PERMISSION_GROUPS: Array<{
   },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 const normalizePerms = (row?: PermRow): Partial<UserPermissions> => {
   if (!row) return {};
   const out: Partial<UserPermissions> = {};
@@ -144,57 +144,40 @@ const normalizePerms = (row?: PermRow): Partial<UserPermissions> => {
   return out;
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
 export const UserManagement = () => {
-  const { role, isMaster, hasPermission, updateUserToMaster, getDefaultPermissions } = usePermissions();
+  const { role, isMaster, hasPermission, getDefaultPermissions } = usePermissions();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [permSearch, setPermSearch] = useState('');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [permSearch, setPermSearch] = useState('');
+
+  // Modais
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<UserRole>('viewer');
+  const [inviteRole, setInviteRole] = useState<UserRole>('tester');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserData | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [syncingProfiles, setSyncingProfiles] = useState(false);
+
+  // Role requests
   const [roleRequests, setRoleRequests] = useState<RoleRequest[]>([]);
   const [assigning, setAssigning] = useState<string | null>(null);
-
-  // ── Data loading ────────────────────────────────────────────────────────────
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: profiles, error: profErr } = await apiClient.from('profiles').select('id, display_name, role, email, created_at').order('display_name');
-      let rows: Array<{ id: string; email: string | null; display_name: string | null; role: string | null; created_at: string }> = [];
+      const { data: profilesData } = await apiClient
+        .from('profiles')
+        .select('id, display_name, role, organization_id, created_at, email');
 
-      if (profErr || !profiles || (profiles as any[]).length === 0) {
-        const { data: authData } = await apiClient.auth.getUser();
-        const cur = authData?.user;
-        if (cur) {
-          rows = [{
-            id: cur.id,
-            email: cur.email || '',
-            display_name: (cur.user_metadata as Record<string, unknown>)?.full_name as string || 'Master',
-            role: 'master',
-            created_at: cur.created_at || '',
-          }];
-        }
-      } else {
-        rows = (profiles || []).map((p: any) => ({
-          id: p.id,
-          email: p.email,
-          display_name: p.display_name,
-          role: p.role,
-          created_at: p.created_at || ''
-        }));
-      }
+      const rows = (profilesData || []) as Array<{
+        id: string; display_name: string | null; role: string; organization_id: string | null; created_at: string; email?: string;
+      }>;
 
       const ids = rows.map(r => r.id);
       if (ids.length > 0) {
@@ -240,8 +223,18 @@ export const UserManagement = () => {
     });
   }, []);
 
-  // ── Filtered lists ──────────────────────────────────────────────────────────
+  // Stats for KPI bar
+  const stats = useMemo(() => {
+    const total = users.length;
+    const masters = users.filter(u => u.profile?.role === 'master' || u.profile?.role === 'admin').length;
+    const managers = users.filter(u => u.profile?.role === 'manager').length;
+    const testers = users.filter(u => u.profile?.role === 'tester').length;
+    const viewers = users.filter(u => u.profile?.role === 'viewer').length;
 
+    return { total, masters, managers, testers, viewers };
+  }, [users]);
+
+  // Filtered lists
   const filteredUsers = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return q ? users.filter(u => (u.profile?.display_name || '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) : users;
@@ -255,8 +248,6 @@ export const UserManagement = () => {
       items: g.items.filter(i => i.label.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q)),
     })).filter(g => g.items.length > 0);
   }, [permSearch]);
-
-  // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!(role === 'master' || role === 'admin')) {
@@ -304,7 +295,7 @@ export const UserManagement = () => {
       }
       setInviteOpen(false);
       setInviteEmail('');
-      setInviteRole('viewer');
+      setInviteRole('tester');
       await fetchUsers();
     } catch (e: unknown) {
       toast({ title: 'Erro', description: e instanceof Error ? e.message : 'Não foi possível enviar.', variant: 'destructive' });
@@ -355,131 +346,185 @@ export const UserManagement = () => {
 
   const canManage = () => role === 'master' || role === 'admin';
 
-  // ── Loading guard ────────────────────────────────────────────────────────────
-
   if (loading && users.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 gap-3 text-muted-foreground">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <span className="text-sm">Carregando usuários...</span>
+        <Loader2 className="h-5 w-5 animate-spin text-brand" />
+        <span className="text-sm">Carregando usuários e permissões...</span>
       </div>
     );
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-
   return (
-    <div className="space-y-6">
+    <div className="flex-1 space-y-6 p-6 animate-slide-up">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Users className="h-6 w-6 text-brand" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Gerenciamento de Usuários</h1>
-              <p className="text-sm text-muted-foreground">Gerencie usuários, papéis e permissões do sistema</p>
-            </div>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <UserCog className="h-6 w-6 text-brand" />
+            Gestão de Usuários e Permissões
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Gerencie membros da equipe, níveis de acesso, papéis funcionais e permissões granulares.
+          </p>
+        </div>
 
-          <div className="flex items-center gap-2">
-            {canManage() && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={handleSyncProfiles} disabled={syncingProfiles} className="h-8 gap-1.5 text-xs">
-                      {syncingProfiles ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                      Sincronizar
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Recarregar lista de usuários</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            {isMaster() && (
-              <Button size="sm" onClick={() => setInviteOpen(true)} className="h-8 gap-1.5 text-xs">
-                <UserPlus className="h-3.5 w-3.5" />
-                Convidar Usuário
-              </Button>
-            )}
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {canManage() && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleSyncProfiles} disabled={syncingProfiles} className="h-9 gap-1.5 text-xs border-border/70">
+                    {syncingProfiles ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                    Sincronizar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Recarregar lista de usuários da base de autenticação</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {isMaster() && (
+            <StandardButton variant="brand" onClick={() => setInviteOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-2" /> Convidar Usuário
+            </StandardButton>
+          )}
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* KPI Metrics Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm shadow-xs">
+          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+            <span>Total de Usuários</span>
+            <Users className="h-4 w-4 text-brand/70" />
+          </div>
+          <div className="text-2xl font-bold text-foreground mt-1">{stats.total}</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm shadow-xs">
+          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+            <span>Master / Admins</span>
+            <Crown className="h-4 w-4 text-purple-400" />
+          </div>
+          <div className="text-2xl font-bold text-purple-400 mt-1">{stats.masters}</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm shadow-xs">
+          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+            <span>Gerentes</span>
+            <Shield className="h-4 w-4 text-blue-400" />
+          </div>
+          <div className="text-2xl font-bold text-blue-400 mt-1">{stats.managers}</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm shadow-xs">
+          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+            <span>Testadores</span>
+            <Play className="h-4 w-4 text-emerald-400" />
+          </div>
+          <div className="text-2xl font-bold text-emerald-400 mt-1">{stats.testers}</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm shadow-xs">
+          <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+            <span>Visualizadores</span>
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="text-2xl font-bold text-muted-foreground mt-1">{stats.viewers}</div>
+        </div>
+      </div>
+
+      {/* Tabs & Search */}
       <Tabs defaultValue="users">
-        <div className="flex items-center justify-between gap-4">
-          <TabsList>
-            <TabsTrigger value="users">Usuários</TabsTrigger>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+          <TabsList className="bg-muted/30 p-1 rounded-xl border border-border/60 h-auto flex flex-wrap gap-1">
+            <TabsTrigger 
+              value="users" 
+              className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+            >
+              <Users className="h-3.5 w-3.5" />
+              Usuários ({users.length})
+            </TabsTrigger>
             {hasPermission('can_manage_groups') && (
-              <TabsTrigger value="groups">Grupos</TabsTrigger>
+              <TabsTrigger 
+                value="groups" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Grupos
+              </TabsTrigger>
             )}
-            <TabsTrigger value="requests">
+            <TabsTrigger 
+              value="requests" 
+              className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+            >
+              <Lock className="h-3.5 w-3.5" />
               Solicitações
               {roleRequests.length > 0 && (
-                <span className="ml-1.5 bg-brand/20 text-brand text-xs rounded-full px-1.5 py-0.5">{roleRequests.length}</span>
+                <span className="ml-1.5 bg-brand/20 text-brand text-xs font-bold rounded-full px-1.5 py-0.2">{roleRequests.length}</span>
               )}
             </TabsTrigger>
             {isMaster() && (
-              <TabsTrigger value="logs" className="flex items-center gap-1.5">
+              <TabsTrigger 
+                value="logs" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
                 <Clock className="h-3.5 w-3.5" />
-                Log Geral
+                Log de Auditoria
               </TabsTrigger>
             )}
           </TabsList>
 
-          {/* Busca */}
-          <div className="relative w-72">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Buscar usuário..."
-              className="pl-8 h-8 text-sm"
+              placeholder="Buscar usuário por nome ou email..."
+              className="pl-8 h-8 text-xs bg-muted/20 border-border/60"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
 
-        {/* ── Tab: Usuários ── */}
+        {/* Tab: Usuários */}
         <TabsContent value="users" className="mt-4">
           {filteredUsers.length === 0 ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">
-              {searchQuery ? 'Nenhum usuário encontrado para a busca.' : 'Nenhum usuário cadastrado.'}
+            <div className="border border-border/60 rounded-xl p-12 text-center text-sm text-muted-foreground bg-card/30">
+              {searchQuery ? 'Nenhum usuário encontrado para a busca informada.' : 'Nenhum usuário cadastrado.'}
             </div>
           ) : (
-            <div className="border border-border rounded-lg overflow-hidden">
-              {/* Header */}
-              <div className="grid grid-cols-[1fr_160px_72px] items-center px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                <div>Usuário</div>
-                <div>Papel</div>
+            <div className="border border-border/70 rounded-xl overflow-hidden bg-card/60 backdrop-blur-sm shadow-xs">
+              <div className="grid grid-cols-[1fr_180px_80px] items-center px-4 py-3 bg-muted/40 border-b border-border/70 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <div>Membro / Email</div>
+                <div>Papel Funcional</div>
                 <div className="text-right">Ações</div>
               </div>
 
-              {/* Rows */}
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border/50">
                 {filteredUsers.map(u => {
                   const userRole = u.profile?.role || 'viewer';
                   const isExpanded = expandedUser === u.id;
 
                   return (
                     <React.Fragment key={u.id}>
-                      {/* Row */}
                       <div
-                        className="grid grid-cols-[1fr_160px_72px] items-center px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer"
+                        className="grid grid-cols-[1fr_180px_80px] items-center px-4 py-3.5 hover:bg-muted/20 transition-colors cursor-pointer"
                         onClick={() => setExpandedUser(prev => prev === u.id ? null : u.id)}
                       >
-                        {/* User info */}
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm truncate">
-                            {u.profile?.display_name || 'Usuário'}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <UserAvatar userId={u.id} className="h-9 w-9 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm text-foreground truncate">
+                              {u.profile?.display_name || 'Usuário Sem Nome'}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                           </div>
-                          <div className="text-xs text-muted-foreground truncate">{u.email}</div>
                         </div>
 
-                        {/* Role */}
                         <div onClick={e => e.stopPropagation()}>
                           {canManage() ? (
                             <Select value={userRole} onValueChange={v => handleRoleChange(u.id, v)}>
-                              <SelectTrigger className={`h-7 text-xs border px-2 ${ROLE_COLORS[userRole]}`}>
+                              <SelectTrigger className={`h-8 text-xs font-semibold border px-2.5 rounded-lg shadow-2xs ${ROLE_COLORS[userRole]}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -491,67 +536,64 @@ export const UserManagement = () => {
                               </SelectContent>
                             </Select>
                           ) : (
-                            <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded border ${ROLE_COLORS[userRole]}`}>
+                            <Badge variant="outline" className={`text-xs font-semibold py-0.5 ${ROLE_COLORS[userRole]}`}>
                               {ROLE_LABELS[userRole]}
-                            </span>
+                            </Badge>
                           )}
                         </div>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedUser(prev => prev === u.id ? null : u.id)}>
-                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setExpandedUser(prev => prev === u.id ? null : u.id)}>
+                            {isExpanded ? <ChevronUp className="h-4 w-4 text-brand" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                           </Button>
                           {isMaster() && userRole !== 'master' && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                               onClick={() => setDeleteTarget(u)}
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
                       </div>
 
-                      {/* Expanded permissions + log panel */}
                       {isExpanded && (
-                        <div className="px-4 py-4 bg-muted/10 border-t border-border space-y-5">
-                          <div className="flex items-center gap-2 justify-between">
-                            <div className="flex items-center gap-1.5 text-sm font-medium">
-                              <Shield className="h-4 w-4 text-muted-foreground" />
-                              Permissões de {u.profile?.display_name || u.email}
+                        <div className="px-5 py-5 bg-muted/15 border-t border-border/60 space-y-5 animate-slide-up">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                              <Shield className="h-4 w-4 text-brand" />
+                              Permissões Granulares de {u.profile?.display_name || u.email}
                             </div>
-                            {/* Busca de permissão */}
-                            <div className="relative w-56">
-                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                            <div className="relative w-full sm:w-64">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                               <Input
-                                placeholder="Buscar permissão..."
-                                className="pl-7 h-7 text-xs"
+                                placeholder="Filtrar permissões..."
+                                className="pl-8 h-8 text-xs bg-muted/20 border-border/60"
                                 value={permSearch}
                                 onChange={e => setPermSearch(e.target.value)}
                               />
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
                             {filteredGroups.map(group => (
-                              <div key={group.key} className="border border-border rounded-md overflow-hidden">
-                                <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border">
-                                  <group.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</span>
+                              <div key={group.key} className="border border-border/70 rounded-xl overflow-hidden bg-card/60 shadow-2xs">
+                                <div className="flex items-center gap-2 px-3.5 py-2.5 bg-muted/40 border-b border-border/60">
+                                  <group.icon className="h-4 w-4 text-brand" />
+                                  <span className="text-xs font-bold text-foreground uppercase tracking-wide">{group.label}</span>
                                 </div>
-                                <div className="divide-y divide-border">
+                                <div className="divide-y divide-border/40">
                                   {group.items.map(item => {
                                     const checked = !!(u.permissions as Record<string, unknown>)?.[item.key];
                                     const disabled = !canManage();
                                     return (
-                                      <div key={item.key} className="flex items-center justify-between px-3 py-2.5 gap-2">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <item.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                      <div key={item.key} className="flex items-center justify-between px-3.5 py-2.5 gap-3 hover:bg-muted/20 transition-colors">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <item.icon className="h-4 w-4 text-muted-foreground shrink-0" />
                                           <div className="min-w-0">
-                                            <div className="text-xs font-medium leading-none">{item.label}</div>
+                                            <div className="text-xs font-semibold text-foreground leading-none">{item.label}</div>
                                             <div className="text-[11px] text-muted-foreground mt-0.5 truncate">{item.desc}</div>
                                           </div>
                                         </div>
@@ -559,7 +601,7 @@ export const UserManagement = () => {
                                           checked={checked}
                                           onCheckedChange={v => handlePermissionChange(u.id, item.key, v)}
                                           disabled={disabled}
-                                          className="shrink-0"
+                                          className="shrink-0 data-[state=checked]:bg-brand"
                                         />
                                       </div>
                                     );
@@ -569,12 +611,11 @@ export const UserManagement = () => {
                             ))}
                           </div>
 
-                          {/* Log de atividades do usuário */}
                           {isMaster() && (
-                            <div>
-                              <div className="flex items-center gap-1.5 text-sm font-medium mb-3">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                Atividades de {u.profile?.display_name || u.email}
+                            <div className="pt-2 border-t border-border/40">
+                              <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
+                                <Clock className="h-4 w-4 text-brand" />
+                                Histórico de Atividades de {u.profile?.display_name || u.email}
                               </div>
                               <ActivityLogPanel userId={u.id} showUserColumn={false} />
                             </div>
@@ -589,59 +630,56 @@ export const UserManagement = () => {
           )}
         </TabsContent>
 
-        {/* ── Tab: Logs Gerais (master) ── */}
+        {/* Tab: Logs Gerais */}
         {isMaster() && (
           <TabsContent value="logs" className="mt-4">
             <ActivityLogPanel userId={null} showUserColumn />
           </TabsContent>
         )}
 
-        {/* ── Tab: Grupos ── */}
+        {/* Tab: Grupos */}
         {hasPermission('can_manage_groups') && (
           <TabsContent value="groups" className="mt-4">
             <GroupsManagement users={users} canManage={hasPermission('can_manage_groups')} />
           </TabsContent>
         )}
 
-        {/* ── Tab: Solicitações ── */}
+        {/* Tab: Solicitações */}
         <TabsContent value="requests" className="mt-4">
           {SINGLE_TENANT ? (
-            <div className="border border-border rounded-lg p-6 text-sm text-muted-foreground text-center">
-              Solicitações desativadas no modo single-tenant.{' '}
-              <span className="text-brand">
-                Defina <code className="font-mono">VITE_SINGLE_TENANT=false</code> no <code className="font-mono">.env.local</code> para ativar.
-              </span>
+            <div className="border border-border/70 rounded-xl p-8 text-xs text-muted-foreground text-center bg-card/30">
+              Solicitações desativadas no modo single-tenant.
             </div>
           ) : roleRequests.length === 0 ? (
-            <div className="border border-border rounded-lg p-6 text-sm text-muted-foreground text-center">
-              Nenhuma solicitação pendente.
+            <div className="border border-border/70 rounded-xl p-8 text-xs text-muted-foreground text-center bg-card/30">
+              Nenhuma solicitação de papel pendente no momento.
             </div>
           ) : (
-            <div className="border border-border rounded-lg overflow-hidden">
-              <div className="grid grid-cols-[1fr_1fr_auto] items-center px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                <div>Usuário</div>
-                <div>Papéis solicitados</div>
-                <div>Ações</div>
+            <div className="border border-border/70 rounded-xl overflow-hidden bg-card/60 backdrop-blur-sm shadow-xs">
+              <div className="grid grid-cols-[1fr_1fr_auto] items-center px-4 py-3 bg-muted/40 border-b border-border/70 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <div>Usuário Solicitante</div>
+                <div>Papéis Solicitados</div>
+                <div className="text-right">Decisão</div>
               </div>
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border/50">
                 {roleRequests.map(r => {
                   const reqUser = users.find(u => u.id === r.user_id);
                   return (
-                    <div key={r.id} className="grid grid-cols-[1fr_1fr_auto] items-center px-4 py-3 gap-4">
+                    <div key={r.id} className="grid grid-cols-[1fr_1fr_auto] items-center px-4 py-3.5 gap-4">
                       <div>
-                        <div className="text-sm font-medium">{reqUser?.profile?.display_name || reqUser?.email || r.user_id}</div>
+                        <div className="text-sm font-semibold text-foreground">{reqUser?.profile?.display_name || reqUser?.email || r.user_id}</div>
                         <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString('pt-BR')}</div>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         {Array.isArray(r.requested_roles) ? r.requested_roles.map(rr => (
-                          <span key={rr} className="text-xs bg-muted text-muted-foreground border border-border rounded px-1.5 py-0.5 capitalize">{rr}</span>
+                          <span key={rr} className="text-xs bg-brand/10 text-brand border border-brand/20 rounded-md px-2 py-0.5 capitalize font-semibold">{rr}</span>
                         )) : null}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" className="h-7 text-xs" disabled={assigning === r.id} onClick={() => approveRequest(r)}>
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10" disabled={assigning === r.id} onClick={() => approveRequest(r)}>
                           <Check className="h-3.5 w-3.5 mr-1" /> Aprovar
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive hover:text-destructive" disabled={assigning === r.id} onClick={() => rejectRequest(r)}>
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/30 text-destructive hover:bg-destructive/10" disabled={assigning === r.id} onClick={() => rejectRequest(r)}>
                           <XIcon className="h-3.5 w-3.5 mr-1" /> Rejeitar
                         </Button>
                       </div>
@@ -654,32 +692,37 @@ export const UserManagement = () => {
         </TabsContent>
       </Tabs>
 
-      {/* ── Modal Convidar ── */}
+      {/* Modal Convidar Usuário */}
       <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="sm:max-w-[440px] rounded-xl border border-border/80 bg-card shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle>Convidar Usuário</DialogTitle>
-            <DialogDescription>Um e-mail de convite será enviado para o endereço informado.</DialogDescription>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-brand" />
+              Convidar Novo Usuário
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Um link de convite e ativação de acesso será enviado para o endereço informado.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="invite-email" className="text-sm">E-mail</Label>
+              <Label htmlFor="invite-email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">E-mail Corporativo *</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="invite-email"
                   name="invite-email"
-                  placeholder="email@exemplo.com"
-                  className="pl-9"
+                  placeholder="exemplo@empresa.com"
+                  className="pl-9 bg-muted/20 border-border/70 text-xs"
                   value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="invite-role" className="text-sm">Papel inicial</Label>
+              <Label htmlFor="invite-role" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Papel Inicial</Label>
               <Select value={inviteRole} onValueChange={v => setInviteRole(v as UserRole)}>
-                <SelectTrigger id="invite-role">
+                <SelectTrigger id="invite-role" className="bg-muted/20 border-border/70 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -690,27 +733,34 @@ export const UserManagement = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button className="w-full" onClick={handleInviteUser} disabled={inviteLoading}>
-              {inviteLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enviando...</> : 'Enviar Convite'}
-            </Button>
           </div>
+          <DialogFooter className="gap-2 pt-2 border-t border-border/40">
+            <StandardButton variant="outline" onClick={() => setInviteOpen(false)} disabled={inviteLoading}>
+              Cancelar
+            </StandardButton>
+            <StandardButton variant="brand" onClick={handleInviteUser} disabled={inviteLoading || !inviteEmail.trim()}>
+              {inviteLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enviando...</> : 'Enviar Convite'}
+            </StandardButton>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Modal Confirmar Remoção ── */}
+      {/* Modal Confirmar Remoção */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-border/80 bg-card shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover Usuário</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja remover <strong>{deleteTarget?.profile?.display_name || deleteTarget?.email}</strong>?
-              Esta ação é irreversível.
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Remover Usuário
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              Tem certeza que deseja remover o usuário <strong className="text-foreground">{deleteTarget?.profile?.display_name || deleteTarget?.email}</strong>?
+              Esta ação revoga permanentemente todas as permissões e acessos ao sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel disabled={deleteLoading}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteUser} disabled={deleteLoading}>
-              {deleteLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Removendo...</> : 'Remover'}
+            <AlertDialogAction onClick={confirmDeleteUser} disabled={deleteLoading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleteLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Removendo...</> : 'Confirmar Remoção'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

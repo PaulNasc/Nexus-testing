@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { updateProject, deleteProjectCascade, getProjectById } from '@/services/projectService';
 import { Project } from '@/types';
-import { Settings, Trash2, Pause, Play, AlertTriangle } from 'lucide-react';
+import { Settings, Trash2, Pause, Play, AlertTriangle, Archive, XCircle, FolderKanban, Check } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { StandardButton } from '@/components/StandardButton';
 
 interface ProjectManagerProps {
   project: Project;
@@ -167,25 +168,20 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({ project, open, o
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-50 text-green-700 border-green-200';
-      case 'paused': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'completed': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'archived': return 'bg-gray-50 text-gray-700 border-gray-200';
-      case 'canceled': return 'bg-red-50 text-red-700 border-red-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active': return 'Ativo';
-      case 'paused': return 'Pausado';
-      case 'completed': return 'Concluído';
-      case 'archived': return 'Arquivado';
-      case 'canceled': return 'Cancelado';
-      default: return status;
+      case 'active':
+        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs font-semibold py-0.5">Ativo</Badge>;
+      case 'paused':
+        return <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-xs font-semibold py-0.5">Pausado</Badge>;
+      case 'completed':
+        return <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs font-semibold py-0.5">Concluído</Badge>;
+      case 'archived':
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-xs font-semibold py-0.5">Arquivado</Badge>;
+      case 'canceled':
+        return <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20 text-xs font-semibold py-0.5">Cancelado</Badge>;
+      default:
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-xs font-semibold py-0.5">{status}</Badge>;
     }
   };
 
@@ -201,109 +197,149 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({ project, open, o
             </Button>
           </DialogTrigger>
         )}
-        <DialogContent className="max-w-md border-0 shadow-lg">
+        <DialogContent className="sm:max-w-[500px] rounded-xl border border-border/80 bg-card shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <span className="inline-block w-4 h-4 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: formData.color || '#00c2a8' }} />
               Gerenciar Projeto
             </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Edite as configurações, altere o status ou gerencie o ciclo de vida do projeto.
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="project-name">Nome do Projeto</Label>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="project-name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nome do Projeto</Label>
               <Input
                 id="project-name"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 onBlur={() => formData.name !== project.name ? persistInline({ name: formData.name.trim() }) : undefined}
-                className=""
+                className="bg-muted/20 border-border/70 text-xs"
               />
             </div>
 
-            <div>
-              <Label htmlFor="project-color">Cor de Identificação</Label>
-              <div className="flex items-center gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="project-color" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cor de Identificação</Label>
+              <div className="flex items-center gap-3 p-2 bg-muted/20 border border-border/60 rounded-lg">
                 <input
                   id="project-color"
                   type="color"
                   value={formData.color}
                   onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
                   onBlur={() => formData.color !== project.color ? persistInline({ color: formData.color }) : undefined}
-                  className="w-12 h-10 rounded border cursor-pointer"
+                  className="w-10 h-8 rounded border cursor-pointer bg-transparent"
                 />
-                <span className="text-sm text-muted-foreground">{formData.color}</span>
+                <span className="text-xs font-mono font-bold text-foreground">{formData.color}</span>
               </div>
             </div>
 
-            <div>
-              <Label>Status Atual</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status Atual</Label>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className={getStatusColor(formData.status)}>
-                  {getStatusLabel(formData.status)}
-                </Badge>
+                {getStatusBadge(formData.status)}
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              {formData.status === 'active' ? (
-                <Button type="button" onClick={() => setShowPauseDialog(true)} className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white border-0">
-                  <Pause className="h-4 w-4 mr-2" /> Pausar
-                </Button>
-              ) : formData.status === 'archived' ? (
-                <Button type="button" onClick={handleResumeProject} className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white border-0">
-                  <Play className="h-4 w-4 mr-2" /> Ativar
-                </Button>
-              ) : (
-                <Button type="button" onClick={handleResumeProject} className="flex-1 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white border-0">
-                  <Play className="h-4 w-4 mr-2" /> Retomar
-                </Button>
-              )}
+            <div className="pt-3 border-t border-border/40 space-y-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ações do Ciclo de Vida</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {formData.status === 'active' ? (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowPauseDialog(true)} 
+                    className="h-9 text-xs border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                  >
+                    <Pause className="h-3.5 w-3.5 mr-1.5" /> Pausar Projeto
+                  </Button>
+                ) : formData.status === 'archived' ? (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleResumeProject} 
+                    className="h-9 text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
+                  >
+                    <Play className="h-3.5 w-3.5 mr-1.5" /> Reativar Projeto
+                  </Button>
+                ) : (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleResumeProject} 
+                    className="h-9 text-xs border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10"
+                  >
+                    <Play className="h-3.5 w-3.5 mr-1.5" /> Retomar Projeto
+                  </Button>
+                )}
 
-              {formData.status !== 'archived' && (
-                <Button type="button" onClick={() => setShowArchiveDialog(true)} className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white border-0">
-                  Arquivar
-                </Button>
-              )}
+                {formData.status !== 'archived' && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowArchiveDialog(true)} 
+                    className="h-9 text-xs border-border/70 text-muted-foreground hover:bg-muted/30"
+                  >
+                    <Archive className="h-3.5 w-3.5 mr-1.5" /> Arquivar
+                  </Button>
+                )}
 
-              {formData.status !== 'canceled' && (
-                <Button type="button" onClick={() => setShowCancelDialog(true)} className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white border-0">
-                  Cancelar Projeto
-                </Button>
-              )}
+                {formData.status !== 'canceled' && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowCancelDialog(true)} 
+                    className="h-9 text-xs border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                  >
+                    <XCircle className="h-3.5 w-3.5 mr-1.5" /> Cancelar
+                  </Button>
+                )}
 
-              {(isMaster() || hasPermission('can_delete_projects')) && (
-                <Button type="button" onClick={() => setShowDeleteDialog(true)} className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white">
-                  <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                </Button>
-              )}
+                {(isMaster() || hasPermission('can_delete_projects')) && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowDeleteDialog(true)} 
+                    className="h-9 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir Projeto
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Confirmação de Exclusão */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-border/80 bg-card shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" /> Excluir Projeto (apenas Master)
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Excluir Projeto Permanentemente
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação é irreversível. Todos os dados vinculados ao projeto serão removidos: Planos, Casos, Execuções, Defeitos e vínculos de Requisitos.
-              <br />
-              Para confirmar, digite exatamente o nome do projeto abaixo: <strong>{project.name}</strong>
+            <AlertDialogDescription className="text-xs text-muted-foreground space-y-2">
+              <p>Esta ação é irreversível. Todos os dados vinculados ao projeto serão removidos em cascata (Planos, Casos, Execuções, Defeitos e Vínculos).</p>
+              <p>Para confirmar, digite exatamente o nome do projeto abaixo: <strong className="text-foreground">{project.name}</strong></p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="mt-2">
-            <Input placeholder={project.name} value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
+            <Input 
+              placeholder={project.name} 
+              value={confirmText} 
+              onChange={(e) => setConfirmText(e.target.value)} 
+              className="bg-muted/20 border-border/70 text-xs font-semibold"
+            />
           </div>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteProject}
               disabled={deleting || confirmText !== project.name || !isMaster()}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? 'Excluindo...' : 'Excluir Tudo'}
+              {deleting ? 'Excluindo...' : 'Confirmar Exclusão'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -311,51 +347,59 @@ export const ProjectManager: React.FC<ProjectManagerProps> = ({ project, open, o
 
       {/* Confirmação de Pausa */}
       <AlertDialog open={showPauseDialog} onOpenChange={setShowPauseDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-border/80 bg-card shadow-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Pausar projeto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Ao pausar, o projeto fica em modo somente leitura. Criação de Planos, Casos e Execuções será desabilitada enquanto estiver pausado.
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              Ao pausar, o projeto entra em modo somente leitura. A criação de novos Planos, Casos e Execuções ficará desabilitada até a retomada.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-teal-600 hover:bg-teal-700" onClick={handlePauseProject}>Confirmar</AlertDialogAction>
+            <AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handlePauseProject}>
+              Confirmar Pausa
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Confirmação de Arquivamento */}
       <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-border/80 bg-card shadow-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Arquivar projeto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Arquivar oculta o projeto do uso diário. Dados permanecem preservados, mas o projeto não aparecerá por padrão. Você pode reativá-lo depois.
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              O projeto será movido para a aba de arquivados. Todos os dados permanecem salvos e podem ser reativados a qualquer momento.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-gray-600 hover:bg-gray-700" onClick={handleArchiveProject}>Arquivar</AlertDialogAction>
+            <AlertDialogAction className="bg-muted text-foreground hover:bg-muted/80" onClick={handleArchiveProject}>
+              Confirmar Arquivamento
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Confirmação de Cancelamento */}
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-border/80 bg-card shadow-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar projeto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Cancelar indica que o projeto foi interrompido. Dados permanecem salvos, porém o projeto não aparecerá por padrão e não permitirá novas criações.
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              O projeto será marcado como cancelado. Seus registros continuarão preservados para auditoria histórica.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2">
             <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction className="bg-amber-600 hover:bg-amber-700" onClick={handleCancelProject}>Confirmar cancelamento</AlertDialogAction>
+            <AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handleCancelProject}>
+              Confirmar Cancelamento
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
   );
 };
+
+export default ProjectManager;

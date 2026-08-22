@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePaginationUrlSync } from '@/hooks/usePaginationUrlSync';
 import { useVirtualTableHeight } from '@/hooks/useVirtualTableHeight';
 import { useNavigate } from 'react-router-dom';
@@ -8,13 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search } from 'lucide-react';
+import { Search, Clock, RefreshCcw, Filter, FileText, ClipboardCheck, Play, Bug, Link2, Activity, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { getActivityLogs, type ActivityLog } from '@/services/apiClientService';
 import { toast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api';
 import { VirtualList } from '@/experimental/VirtualList';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { StandardButton } from '@/components/StandardButton';
+import { UserAvatar } from '@/components/ui/UserAvatar';
 
 interface HistoryItem {
   id: string;
@@ -37,21 +39,21 @@ export const History = () => {
   const topBlockRef = useRef<HTMLDivElement | null>(null);
   const listCardRef = useRef<HTMLDivElement | null>(null);
   const listHeaderRef = useRef<HTMLDivElement | null>(null);
-  // Altura da lista virá do hook de layout virtual
   const paginationRef = useRef<HTMLDivElement | null>(null);
   const [rowSize, setRowSize] = useState<number>(72);
-  // Perfis de usuários para exibir avatar/nome
   const [profilesMap, setProfilesMap] = useState<Record<string, { display_name: string | null; avatar_url?: string | null }>>({});
-  // Filtros (controlados) e filtros aplicados
+
+  // Filtros
   const [q, setQ] = useState('');
-  const [daysFilter, setDaysFilter] = useState<number>(90); // Padrão: últimos 90 dias
+  const [daysFilter, setDaysFilter] = useState<number>(90);
   const [typeFilter, setTypeFilter] = useState<'all' | 'plan' | 'case' | 'execution' | 'defect' | 'requirement'>('all');
   const [applied, setApplied] = useState<{ q: string; days: number; type: 'all' | 'plan' | 'case' | 'execution' | 'defect' | 'requirement' }>({ q: '', days: 90, type: 'all' });
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<HistoryItem | null>(null);
-  // Paginação padrão do sistema
+
+  // Paginação
   const [page, setPage] = useState<number>(1);
-  const [pageSize] = useState<number>(5);
+  const [pageSize] = useState<number>(10);
 
   const deriveTypeFromAction = (action: string): HistoryItem['type'] => {
     const a = action.toLowerCase();
@@ -63,7 +65,6 @@ export const History = () => {
     return 'other';
   };
 
-  // Abrir modal específico conforme metadados do log
   const openLinkedModal = (item: HistoryItem) => {
     const entity = (item.meta?.entity as string | undefined) || item.type;
     const id = (item.meta?.id as string | undefined);
@@ -89,7 +90,6 @@ export const History = () => {
         return;
       }
     }
-    // Fallback: abrir modal genérico
     setSelected(item);
     setOpen(true);
   };
@@ -98,59 +98,48 @@ export const History = () => {
     try {
       if (E2E_MOCK) {
         const now = new Date();
-        const mockUser = 'e2e-user';
-        const mockItems: HistoryItem[] = [
-          { id: 'log1', type: 'plan', action: 'Plano criado PT-1', description: 'Plano de Teste criado — Título: Alpha', updated_at: now, data: { user_id: mockUser }, meta: { entity: 'plan', id: 'pt-1' } },
-          { id: 'log2', type: 'case', action: 'Caso atualizado CT-2', description: 'Caso de Teste atualizado — Campos: título', updated_at: now, data: { user_id: mockUser }, meta: { entity: 'case', id: 'ct-2' } },
-          { id: 'log3', type: 'execution', action: 'Execução criada EX-3', description: 'Execução de Teste criada — Status: not_tested', updated_at: now, data: { user_id: mockUser }, meta: { entity: 'execution', id: 'ex-3' } },
-          { id: 'log4', type: 'requirement', action: 'Requisito criado RQ-4', description: 'Requisito criado — Título: Beta', updated_at: now, data: { user_id: mockUser }, meta: { entity: 'requirement', id: 'rq-4' } },
-          { id: 'log5', type: 'defect', action: 'Defeito criado DF-5', description: 'Defeito criado — Status: open', updated_at: now, data: { user_id: mockUser }, meta: { entity: 'defect', id: 'df-5' } },
+        const mock: HistoryItem[] = [
+          { id: '1', type: 'plan', action: 'Criou plano de teste', description: 'Plano de teste de regressão v1.0', updated_at: new Date(now.getTime() - 1000 * 60 * 30), data: { user_id: 'mock-user-1' } },
+          { id: '2', type: 'case', action: 'Atualizou caso de teste', description: 'CT-001 — Validação de Login com MFA', updated_at: new Date(now.getTime() - 1000 * 60 * 90), data: { user_id: 'mock-user-2' } },
+          { id: '3', type: 'execution', action: 'Registrou execução', description: 'EXE-001 — Aprovado sem ressalvas', updated_at: new Date(now.getTime() - 1000 * 60 * 180), data: { user_id: 'mock-user-1' } },
+          { id: '4', type: 'defect', action: 'Abriu defeito', description: 'DEF-001 — Falha no carregamento de tokens', updated_at: new Date(now.getTime() - 1000 * 60 * 360), data: { user_id: 'mock-user-3' } },
+          { id: '5', type: 'requirement', action: 'Cadastrou requisito', description: 'REQ-001 — Autenticação de dois fatores', updated_at: new Date(now.getTime() - 1000 * 60 * 720), data: { user_id: 'mock-user-1' } },
         ];
-        setItems(mockItems);
-        setProfilesMap({ [mockUser]: { display_name: 'E2E User', avatar_url: null } });
+        setItems(mock);
+        setProfilesMap({
+          'mock-user-1': { display_name: 'Paulo Ricardo', avatar_url: null },
+          'mock-user-2': { display_name: 'Carlos Oliveira', avatar_url: null },
+          'mock-user-3': { display_name: 'Ana Souza', avatar_url: null },
+        });
         setLoading(false);
         return;
       }
-      // Range padrão: últimos 90 dias (limite máximo)
-      const daysBack = range?.start ? Math.min(90, Math.ceil((new Date().getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24))) : 90;
-      const start = new Date();
-      start.setDate(start.getDate() - daysBack);
-      const end = range?.end ?? new Date();
-      // Busca logs de TODOS os usuários (sistema completo)
-      const logs: ActivityLog[] = await getActivityLogs('', { dateStart: start, dateEnd: end });
-      const historyItems: HistoryItem[] = logs.map((log) => ({
-        id: log.id,
-        type: deriveTypeFromAction(log.action),
-        action: log.action,
-        description: log.context ?? undefined,
-        updated_at: log.created_at,
-        data: { user_id: log.user_id },
-        meta: log.metadata as Record<string, unknown> | undefined
-      }));
 
-      // Ordenar por data mais recente
-      historyItems.sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime());
-      setItems(historyItems);
-      // Carregar perfis/avatars dos usuários presentes
-      const uids = Array.from(new Set(historyItems.map(i => i.data.user_id).filter(Boolean)));
-      if (uids.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, display_name, avatar_url')
-          .in('id', uids);
+      setLoading(true);
+      const logs = await getActivityLogs(100, undefined, range);
+      const userIds = Array.from(new Set((logs || []).map((l: ActivityLog) => l.user_id).filter(Boolean)));
+      if (userIds.length > 0) {
+        const { data: profs } = await apiClient.from('profiles').select('id, display_name, avatar_url').in('id', userIds);
         const map: Record<string, { display_name: string | null; avatar_url?: string | null }> = {};
-        ((profiles as Array<{ id: string; display_name: string | null; avatar_url: string | null }> | null) || []).forEach((p) => {
-          map[p.id] = { display_name: p.display_name ?? null, avatar_url: p.avatar_url ?? null };
-        });
+        (profs || []).forEach((p: any) => { map[p.id] = { display_name: p.display_name, avatar_url: p.avatar_url }; });
         setProfilesMap(map);
-      } else {
-        setProfilesMap({});
       }
+
+      const mapped: HistoryItem[] = (logs || []).map((l: ActivityLog) => ({
+        id: l.id,
+        type: deriveTypeFromAction(l.action),
+        action: l.action,
+        description: l.details || '',
+        updated_at: new Date(l.created_at),
+        data: { user_id: l.user_id },
+        meta: l.metadata as Record<string, unknown>,
+      }));
+      setItems(mapped);
     } catch (error) {
       console.error('Erro ao carregar histórico:', error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar histórico",
+        description: "Não foi possível carregar o histórico de atividades.",
         variant: "destructive"
       });
     } finally {
@@ -159,19 +148,14 @@ export const History = () => {
   }, [user, E2E_MOCK]);
 
   useEffect(() => {
-    if (user) {
-      loadHistoryData();
-    }
-  }, [user, loadHistoryData]);
-
-  // Removido: controle de overflow agora centralizado no Layout
+    loadHistoryData();
+  }, [loadHistoryData]);
 
   useEffect(() => {
-    // Adaptar para novo formato de filtros (days ao invés de dateStart/dateEnd)
     const params = new URLSearchParams(window.location.search);
     const qParam = params.get('q') || '';
     const daysParam = parseInt(params.get('days') || '90', 10);
-    const typeParam = params.get('type') as any || 'all';
+    const typeParam = (params.get('type') as any) || 'all';
     setQ(qParam);
     setDaysFilter(isNaN(daysParam) ? 90 : Math.min(90, daysParam));
     setTypeFilter(typeParam);
@@ -180,19 +164,13 @@ export const History = () => {
     if (!isNaN(pageParam)) setPage(pageParam);
   }, []);
 
-  // Sem abas: filtro por tipo é controlado apenas pelo Select acima
-
-  // Filtro e paginação calculados antes dos efeitos de layout
   const filteredItems = useMemo(() => {
     const f = applied;
     let list = items;
-    // Tipo
     if (f.type !== 'all') list = list.filter(it => it.type === f.type);
-    // Filtro por dias (já aplicado no carregamento, mas reforçado aqui)
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - f.days);
     list = list.filter(it => it.updated_at >= cutoffDate);
-    // Busca textual (usuário, ação/tipo, descrição)
     const term = (f.q || '').trim().toLowerCase();
     if (term) {
       list = list.filter(it => {
@@ -215,7 +193,6 @@ export const History = () => {
     return filteredItems.slice(start, start + pageSize);
   }, [filteredItems, currentPage, pageSize]);
 
-  // Altura calculada via hook reutilizável
   const { listHeight } = useVirtualTableHeight({
     containerRef,
     listHeaderRef,
@@ -228,50 +205,42 @@ export const History = () => {
     minHeight: 240,
   });
 
-  // Medir altura real de uma linha quando a lista for renderizada
-  useEffect(() => {
-    const el = listCardRef.current?.querySelector('.virtual-list-container [data-index="0"]') as HTMLElement | null;
-    if (el) {
-      const h = Math.ceil(el.getBoundingClientRect().height);
-      if (h && Math.abs(h - rowSize) > 1) setRowSize(h);
+  const getTypeBadge = (type: string) => {
+    switch (type) {
+      case 'plan':
+        return <Badge variant="outline" className="bg-brand/10 text-brand border-brand/20 text-xs font-semibold py-0.5"><FileText className="h-3 w-3 mr-1" /> Plano</Badge>;
+      case 'case':
+        return <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/20 text-xs font-semibold py-0.5"><ClipboardCheck className="h-3 w-3 mr-1" /> Caso</Badge>;
+      case 'execution':
+        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs font-semibold py-0.5"><Play className="h-3 w-3 mr-1" /> Execução</Badge>;
+      case 'defect':
+        return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 text-xs font-semibold py-0.5"><Bug className="h-3 w-3 mr-1" /> Defeito</Badge>;
+      case 'requirement':
+        return <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs font-semibold py-0.5"><Link2 className="h-3 w-3 mr-1" /> Requisito</Badge>;
+      default:
+        return <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-xs font-semibold py-0.5"><Activity className="h-3 w-3 mr-1" /> Ação</Badge>;
     }
-  }, [limitedItems.length, items.length, rowSize]);
-
-  // Itens não abrem modal; histórico mostra resumo apenas
-
-  // ícones contextuais removidos para manter minimalismo da lista
+  };
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case 'plan': return 'Plano';
-      case 'case': return 'Caso';
+      case 'plan': return 'Plano de Teste';
+      case 'case': return 'Caso de Teste';
       case 'execution': return 'Execução';
       case 'defect': return 'Defeito';
       case 'requirement': return 'Requisito';
-      default: return 'Ação';
+      default: return 'Geral';
     }
   };
 
-  // Helpers mínimos
-
-  // Trunca descrições longas para manter os cards compactos
-  const truncateText = (txt?: string, max: number = 160) => {
-    if (!txt) return '';
-    const clean = txt.replace(/\s+/g, ' ').trim();
-    return clean.length > max ? clean.slice(0, max) + '…' : clean;
-  };
-
-  // Aplicar filtros quando clicado
   const applyFilters = () => {
     const nextApplied = { q, days: Math.min(90, daysFilter), type: typeFilter as 'all'|'plan'|'case'|'execution'|'defect'|'requirement' };
     setApplied(nextApplied);
     const start = new Date();
     start.setDate(start.getDate() - nextApplied.days);
     const end = new Date();
-    // Recarrega do backend com o range
     loadHistoryData({ start, end });
     setPage(1);
-    // Atualizar URL
     const params = new URLSearchParams();
     if (nextApplied.q) params.set('q', nextApplied.q);
     params.set('days', String(nextApplied.days));
@@ -280,155 +249,132 @@ export const History = () => {
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
   };
 
-  /** REMOVIDO: bloco duplicado de filteredItems/totalItems/currentPage/limitedItems */
-
-  // Garante que a página atual exista quando filtros mudarem
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  useEffect(() => {
-    writeFromState(applied, currentPage);
-  }, [applied, currentPage, writeFromState]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div ref={containerRef} className="flex-1 p-6 flex flex-col gap-6 min-h-0 overflow-hidden" data-testid="history-page">
-      {/* Título e ações */}
-      <div className="flex items-center justify-between">
+    <div ref={containerRef} className="flex-1 p-6 flex flex-col gap-6 min-h-0 overflow-hidden animate-slide-up" data-testid="history-page">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Histórico de Atividades</h2>
-          <p className="text-gray-600 dark:text-gray-400">Visualize e filtre as ações recentes</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <Clock className="h-6 w-6 text-brand" />
+            Histórico e Auditoria de Atividades
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Rastreamento completo de eventos, criações, edições e execuções realizadas no sistema.
+          </p>
         </div>
+
+        <Button variant="outline" size="sm" onClick={() => loadHistoryData()} className="h-9 gap-1.5 text-xs border-border/70 self-start sm:self-auto">
+          <RefreshCcw className="h-3.5 w-3.5" /> Atualizar
+        </Button>
       </div>
-      {/* Filtros minimalistas */}
-      <Card ref={topBlockRef} className="filters">
-        <CardContent className="p-3">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-2 items-center">
-            <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-muted-foreground"/>
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Pesquisar por usuário, ação ou detalhe"
-                className="h-9"
-              />
-            </div>
-            <Select value={String(daysFilter)} onValueChange={(v) => setDaysFilter(parseInt(v, 10))}>
-              <SelectTrigger className="h-9 w-[140px]"><SelectValue placeholder="Período" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5 dias</SelectItem>
-                <SelectItem value="10">10 dias</SelectItem>
-                <SelectItem value="25">25 dias</SelectItem>
-                <SelectItem value="50">50 dias</SelectItem>
-                <SelectItem value="90">90 dias</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as 'all' | 'plan' | 'case' | 'execution' | 'defect' | 'requirement')}>
-              <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="plan">Planos</SelectItem>
-                <SelectItem value="case">Casos</SelectItem>
-                <SelectItem value="execution">Execuções</SelectItem>
-                <SelectItem value="defect">Defeitos</SelectItem>
-                <SelectItem value="requirement">Requisitos</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button size="icon" variant="secondary" onClick={applyFilters} aria-label="Aplicar filtros">
-              <Search className="h-4 w-4"/>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Sem abas; o filtro por tipo está no Select acima */}
-
-      {/* Lista em tabela com cabeçalho */}
-      {filteredItems.length > 0 ? (
-        <Card ref={listCardRef} className="bg-card border border-border rounded-lg overflow-hidden" data-testid="history-list">
-          <div ref={listHeaderRef} className="grid grid-cols-[1.2fr_0.8fr_1.8fr_0.8fr] items-start gap-4 px-4 py-3 bg-muted/50 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            <div>Usuário</div>
-            <div className="text-center">Ação</div>
-            <div className="text-center">Detalhes</div>
-            <div className="text-right">Data</div>
-          </div>
-          <div className="border-t no-scrollbar">
-            <VirtualList
-              key={`hist-${currentPage}-${pageSize}-${rowSize}`}
-              items={limitedItems}
-              itemKey={(it) => `${it.type}-${it.id}`}
-              estimateSize={rowSize}
-              className="overflow-x-hidden no-scrollbar"
-              height={listHeight}
-              overscan={4}
-              renderItem={(item) => {
-                const prof = profilesMap[item.data.user_id];
-                return (
-                  <div
-                    className="grid grid-cols-[1.2fr_0.8fr_1.8fr_0.8fr] items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => openLinkedModal(item)}
-                    data-testid="history-row"
-                    data-entity={item.meta?.entity || item.type}
-                    data-itemid={item.meta?.id || item.id}
-                  >
-                    {/* Usuário */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Avatar className="h-7 w-7">
-                        <AvatarImage src={prof?.avatar_url || undefined} alt={prof?.display_name || ''} />
-                        <AvatarFallback>{(prof?.display_name || 'U')?.slice(0,2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="truncate font-medium">{prof?.display_name || '—'}</div>
-                    </div>
-
-                    {/* Ação */}
-                    <div className="min-w-0 flex items-center gap-2 justify-center">
-                      <Badge variant="outline">{getTypeLabel(item.type)}</Badge>
-                    </div>
-
-                    {/* Detalhes */}
-                    <div className="text-sm text-muted-foreground min-w-0 pr-4 text-center">
-                      {item.description && (
-                        <div className="truncate">{truncateText(item.description, 180)}</div>
-                      )}
-                    </div>
-
-                    {/* Data */}
-                    <div className="text-sm text-right text-muted-foreground tabular-nums min-w-0 pl-2">
-                      {`${item.updated_at.toLocaleDateString('pt-BR')}, ${item.updated_at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
-                    </div>
-                  </div>
-                );
-              }}
+      {/* Filtros */}
+      <div ref={topBlockRef} className="border border-border/70 rounded-xl p-3.5 bg-card/60 backdrop-blur-sm shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2.5 items-center">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Pesquisar por usuário, ação ou detalhe..."
+              className="pl-8 h-9 text-xs bg-muted/20 border-border/60"
             />
           </div>
-        </Card>
+
+          <Select value={String(daysFilter)} onValueChange={(v) => setDaysFilter(parseInt(v, 10))}>
+            <SelectTrigger className="h-9 w-full sm:w-[140px] text-xs bg-muted/20 border-border/60">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">Últimos 5 dias</SelectItem>
+              <SelectItem value="10">Últimos 10 dias</SelectItem>
+              <SelectItem value="25">Últimos 25 dias</SelectItem>
+              <SelectItem value="50">Últimos 50 dias</SelectItem>
+              <SelectItem value="90">Últimos 90 dias</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+            <SelectTrigger className="h-9 w-full sm:w-[160px] text-xs bg-muted/20 border-border/60">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Tipos</SelectItem>
+              <SelectItem value="plan">Planos de Teste</SelectItem>
+              <SelectItem value="case">Casos de Teste</SelectItem>
+              <SelectItem value="execution">Execuções</SelectItem>
+              <SelectItem value="defect">Defeitos</SelectItem>
+              <SelectItem value="requirement">Requisitos</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <StandardButton variant="brand" onClick={applyFilters} className="h-9 px-3">
+            <Filter className="h-3.5 w-3.5 mr-1.5" /> Filtrar
+          </StandardButton>
+        </div>
+      </div>
+
+      {/* Lista em tabela */}
+      {filteredItems.length > 0 ? (
+        <div ref={listCardRef} className="border border-border/70 rounded-xl overflow-hidden bg-card/60 backdrop-blur-sm shadow-xs flex-1 flex flex-col min-h-0" data-testid="history-list">
+          <div ref={listHeaderRef} className="grid grid-cols-[1.2fr_1fr_2fr_1fr] items-center gap-4 px-4 py-3 bg-muted/40 border-b border-border/70 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <div>Usuário</div>
+            <div>Entidade / Tipo</div>
+            <div>Detalhes da Atividade</div>
+            <div className="text-right">Data & Hora</div>
+          </div>
+          <div className="flex-1 overflow-y-auto divide-y divide-border/50">
+            {limitedItems.map((item) => {
+              const prof = profilesMap[item.data.user_id];
+              return (
+                <div
+                  key={`${item.type}-${item.id}`}
+                  className="grid grid-cols-[1.2fr_1fr_2fr_1fr] items-center gap-4 px-4 py-3 hover:bg-muted/20 transition-colors cursor-pointer"
+                  onClick={() => openLinkedModal(item)}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <UserAvatar userId={item.data.user_id} className="h-7 w-7 shrink-0" />
+                    <div className="truncate font-semibold text-xs text-foreground">
+                      {prof?.display_name || 'Usuário'}
+                    </div>
+                  </div>
+
+                  <div>
+                    {getTypeBadge(item.type)}
+                  </div>
+
+                  <div className="text-xs text-muted-foreground min-w-0 pr-4">
+                    <div className="text-foreground font-medium truncate">{item.action}</div>
+                    {item.description && (
+                      <div className="truncate text-muted-foreground/80 text-[11px] mt-0.5">{item.description}</div>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-right text-muted-foreground font-mono tabular-nums min-w-0 pl-2">
+                    {`${item.updated_at.toLocaleDateString('pt-BR')}, ${item.updated_at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Nenhum resultado encontrado com os filtros atuais.</p>
+        <div className="border border-border/60 rounded-xl p-12 text-center text-muted-foreground bg-card/30">
+          Nenhum registro de atividade encontrado com os filtros atuais.
         </div>
       )}
+
       {/* Paginação */}
       {filteredItems.length > 0 && (
-        <div ref={paginationRef} className="flex items-center justify-between pt-2">
-          <div className="text-sm text-muted-foreground">
-            {(() => {
-              const start = (currentPage - 1) * pageSize + 1;
-              const end = Math.min(currentPage * pageSize, totalItems);
-              return `Mostrando ${start}–${end} de ${totalItems}`;
-            })()}
+        <div ref={paginationRef} className="flex items-center justify-between pt-1">
+          <div className="text-xs text-muted-foreground">
+            Mostrando {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalItems)} de {totalItems} eventos
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
+              className="h-8 text-xs border-border/70"
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
             >
@@ -437,6 +383,7 @@ export const History = () => {
             <Button
               variant="outline"
               size="sm"
+              className="h-8 text-xs border-border/70"
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
             >
@@ -446,34 +393,42 @@ export const History = () => {
         </div>
       )}
 
-      {/* Dialog de detalhes do log */}
+      {/* Dialog de detalhes */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-[480px] rounded-xl border border-border/80 bg-card shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle>Detalhes da ação</DialogTitle>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <Clock className="h-5 w-5 text-brand" />
+              Detalhes do Evento
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Registro auditável de alteração no sistema.
+            </DialogDescription>
           </DialogHeader>
           {selected && (
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-7 w-7">
-                  <AvatarImage src={profilesMap[selected.data.user_id]?.avatar_url || undefined} />
-                  <AvatarFallback>{(profilesMap[selected.data.user_id]?.display_name || 'U').slice(0,2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="font-medium">{profilesMap[selected.data.user_id]?.display_name || '—'}</div>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Ação: </span>
-                <span className="font-medium">{getTypeLabel(selected.type)}</span>
-              </div>
-              {selected.description && (
+            <div className="space-y-3.5 py-2 text-xs">
+              <div className="flex items-center gap-2.5 p-3 rounded-lg bg-muted/30 border border-border/50">
+                <UserAvatar userId={selected.data.user_id} className="h-8 w-8 shrink-0" />
                 <div>
-                  <span className="text-muted-foreground">Detalhes: </span>
-                  <span>{selected.description}</span>
+                  <div className="font-bold text-foreground">{profilesMap[selected.data.user_id]?.display_name || 'Usuário'}</div>
+                  <div className="text-[11px] text-muted-foreground">{selected.data.user_id}</div>
                 </div>
-              )}
-              <div>
-                <span className="text-muted-foreground">Data: </span>
-                <span className="tabular-nums">{`${selected.updated_at.toLocaleDateString('pt-BR')}, ${selected.updated_at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}</span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-muted/20 border border-border/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Ação Executada</span>
+                  {getTypeBadge(selected.type)}
+                </div>
+                <div className="font-semibold text-foreground text-sm">{selected.action}</div>
+                {selected.description && (
+                  <div className="text-muted-foreground leading-relaxed pt-1 border-t border-border/30">{selected.description}</div>
+                )}
+              </div>
+
+              <div className="text-[11px] text-muted-foreground flex items-center justify-between pt-1">
+                <span>Registrado em:</span>
+                <span className="font-mono text-foreground font-semibold">{`${selected.updated_at.toLocaleDateString('pt-BR')}, ${selected.updated_at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`}</span>
               </div>
             </div>
           )}
@@ -482,3 +437,5 @@ export const History = () => {
     </div>
   );
 };
+
+export default History;
