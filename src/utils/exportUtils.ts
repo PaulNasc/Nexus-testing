@@ -1,4 +1,3 @@
-
 import { TestPlan, TestCase, TestExecution, Requirement, Defect } from '@/types';
 import { priorityLabel, testCaseTypeLabel, executionStatusLabel } from '@/lib/labels';
 
@@ -7,17 +6,21 @@ export type ExportFormat = 'pdf' | 'word' | 'txt' | 'md';
 // Função de tradução de status
 const translateStatus = (status: string) => {
   const statusMap: { [key: string]: string } = {
-    'open': 'aberto',
-    'closed': 'fechado',
-    'in_progress': 'em andamento',
-    'resolved': 'resolvido',
-    'pending': 'pendente',
-    'approved': 'aprovado',
-    'rejected': 'rejeitado',
-    'active': 'ativo',
-    'inactive': 'inativo',
-    'draft': 'rascunho',
-    'review': 'em revisão'
+    'open': 'Aberto',
+    'closed': 'Fechado',
+    'in_progress': 'Em andamento',
+    'resolved': 'Resolvido',
+    'pending': 'Pendente',
+    'approved': 'Aprovado',
+    'rejected': 'Rejeitado',
+    'active': 'Ativo',
+    'inactive': 'Inativo',
+    'draft': 'Rascunho',
+    'review': 'Em revisão',
+    'passed': 'Aprovado',
+    'failed': 'Reprovado',
+    'blocked': 'Bloqueado',
+    'not_tested': 'Não testado'
   };
   return statusMap[status] || status;
 };
@@ -34,14 +37,12 @@ const toMarkdownListOrParagraph = (s: string): string => {
   const text = normalizeText(s);
   if (!text) return '';
 
-  // Caso específico: "Contexto consolidado por caso:" seguido de linhas por caso
   if (text.startsWith('Contexto consolidado por caso:')) {
     const [, ...lines] = text.split(/\r?\n/);
     const items = lines.filter(Boolean).map(l => l.replace(/^#\d+\s*/, '').trim());
     return ['Contexto consolidado por caso:', ...items.map((i, idx) => `${idx + 1}. ${i}`)].join('\n');
   }
 
-  // Se possuir marcadores comuns ou linhas com '-' já tratamos como lista
   if (hasListMarkers(text)) {
     return text
       .split(/\r?\n/)
@@ -49,25 +50,20 @@ const toMarkdownListOrParagraph = (s: string): string => {
         const t = l.trim();
         if (!t) return '';
         if (/^[-•]/.test(t)) return `- ${t.replace(/^[-•]\s*/, '')}`;
-        if (/^\u00BA/.test(t)) return `- ${t.replace(/^\u00BA\s*/, '')}`; // º
+        if (/^\u00BA/.test(t)) return `- ${t.replace(/^\u00BA\s*/, '')}`;
         if (/^#\d+\s+/.test(t)) return `- ${t.replace(/^#\d+\s+/, '')}`;
         return t;
       })
       .join('\n');
   }
 
-  // Heurística para branches: se mencionar "branch"(es) e conter vírgulas, quebrar em lista com marcador 'º'
   if (/branch/i.test(text) && text.includes(',')) {
-    const parts = text
-      .split(/[:,]/)
-      .map(p => p.trim())
-      .filter(Boolean);
+    const parts = text.split(/[:,]/).map(p => p.trim()).filter(Boolean);
     if (parts.length > 1) {
       const [label, ...rest] = parts;
       const items = rest.map(r => r.replace(/^e\s+/i, '').trim()).filter(Boolean);
       if (items.length) {
-        // Usa prefixo literal 'º ' para se aproximar do estilo desejado nos exports Markdown/TXT
-        return `${label}:\n${items.map(i => `º ${i}`).join('\n')}`;
+        return `${label}:\n${items.map(i => `* ${i}`).join('\n')}`;
       }
     }
   }
@@ -89,7 +85,6 @@ const toHTMLListOrParagraph = (s: string): string => {
     return `<ul>${items.map(i => `<li>${bulletPrefix ? `${bulletPrefix}` : ''}${escape(i)}</li>`).join('')}</ul>`;
   };
 
-  // Contexto consolidado por caso
   if (text.startsWith('Contexto consolidado por caso:')) {
     const [label, ...lines] = text.split(/\r?\n/);
     const items = lines.filter(Boolean).map(l => l.replace(/^#\d+\s*/, '').trim());
@@ -97,7 +92,6 @@ const toHTMLListOrParagraph = (s: string): string => {
     return `<p>${escape(label)}</p>${renderOL(items)}`;
   }
 
-  // Linhas com marcadores '-', 'º' ou '#N '
   if (hasListMarkers(text)) {
     const items = text
       .split(/\r?\n/)
@@ -107,20 +101,14 @@ const toHTMLListOrParagraph = (s: string): string => {
     return renderUL(items);
   }
 
-  // Heurística de branches: contém 'branch' e vírgulas
   if (/branch/i.test(text) && text.includes(',')) {
     const [label, rest] = text.split(/:/, 2);
-    const items = (rest || '')
-      .split(',')
-      .map(p => p.replace(/^e\s+/i, '').trim())
-      .filter(Boolean);
+    const items = (rest || '').split(',').map(p => p.replace(/^e\s+/i, '').trim()).filter(Boolean);
     if (items.length) {
-      // Renderiza como lista sem marcadores padrão e prefixa cada item com 'º '
-      return `<p>${escape(label)}:</p><ul style="list-style:none; padding-left:0; margin:0 0 12px 0;">${items.map(i => `<li>º ${escape(i)}</li>`).join('')}</ul>`;
+      return `<p>${escape(label)}:</p><ul style="list-style:none; padding-left:0; margin:0 0 12px 0;">${items.map(i => `<li>• ${escape(i)}</li>`).join('')}</ul>`;
     }
   }
 
-  // Fallback: parágrafos com <br/>
   return `<p>${escape(text).replace(/\r?\n/g, '<br/>')}</p>`;
 };
 
@@ -134,8 +122,10 @@ export const exportItem = async (
   
   if (format === 'pdf') {
     await exportToPDF(content, filename);
+  } else if (format === 'word') {
+    downloadWordFile(content, filename);
   } else {
-    downloadTextFile(content, filename);
+    downloadTextFile(content, filename, format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8');
   }
 };
 
@@ -182,32 +172,29 @@ const generateMarkdownContent = (
     if ((item as any).scope) content += `## Escopo\n${toMarkdownListOrParagraph((item as any).scope || '')}\n\n`;
     if ((item as any).approach) content += `## Abordagem\n${toMarkdownListOrParagraph((item as any).approach || '')}\n\n`;
     if ((item as any).criteria) content += `## Critérios\n${toMarkdownListOrParagraph((item as any).criteria || '')}\n\n`;
-    
-    const branches = (item as any).branches || (item as any).resources;
-    if (branches) {
-      content += `## Branches de Entrega\n${toMarkdownListOrParagraph(branches)}\n\n`;
-    }
+    if ((item as any).resources) content += `## Recursos\n${toMarkdownListOrParagraph((item as any).resources || '')}\n\n`;
+    if ((item as any).schedule) content += `## Cronograma\n${toMarkdownListOrParagraph((item as any).schedule || '')}\n\n`;
+    if ((item as any).risks) content += `## Riscos\n${toMarkdownListOrParagraph((item as any).risks || '')}\n\n`;
+    if ((item as any).status) content += `**Status:** ${translateStatus((item as any).status)}\n\n`;
   }
   
   if (type === 'case' && 'steps' in item) {
-    if ((item as any).branches) {
-      content += `**Branch:** ${(item as any).branches}\n\n`;
-    }
-
     if (item.preconditions) {
       content += `## Pré-condições\n${item.preconditions}\n\n`;
     }
     
-    content += `## Passos de Teste\n\n`;
-    content += `| Passo | Ação | Resultado Esperado |\n`;
-    content += `|-------|------|--------------------|\n`;
-    
-    item.steps?.forEach((step: any, index: number) => {
-      content += `| ${step.order || index + 1} | ${step.action} | ${step.expected_result} |\n`;
-    });
+    if (Array.isArray(item.steps) && item.steps.length > 0) {
+      content += `## Passos de Teste\n\n`;
+      content += `| Passo | Ação | Resultado Esperado |\n`;
+      content += `|-------|------|--------------------|\n`;
+      item.steps.forEach((step: any, index: number) => {
+        content += `| ${step.order || index + 1} | ${step.action || ''} | ${step.expected_result || ''} |\n`;
+      });
+      content += '\n';
+    }
     
     if (item.expected_result) {
-      content += `\n## Resultado Final Esperado\n${item.expected_result}\n\n`;
+      content += `## Resultado Final Esperado\n${item.expected_result}\n\n`;
     }
     
     if (item.priority) {
@@ -221,63 +208,18 @@ const generateMarkdownContent = (
   
   if (type === 'execution') {
     const execution = item as TestExecution;
-    content += `## Status\n${executionStatusLabel(execution.status as any)}\n\n`;
-    
-    if (execution.actual_result) {
-      content += `## Resultado Obtido\n${execution.actual_result}\n\n`;
-    }
-    
-    if (execution.executed_by) {
-      content += `**Executado por:** ${execution.executed_by}\n\n`;
-    }
-    
-    content += `**Data de Execução:** ${new Date(execution.executed_at as any).toLocaleDateString()}\n\n`;
+    content += `**Status:** ${executionStatusLabel(execution.status as any)}\n\n`;
+    if (execution.executed_by) content += `**Executor:** ${execution.executed_by}\n\n`;
+    if (execution.executed_at) content += `**Data da Execução:** ${new Date(execution.executed_at).toLocaleString('pt-BR')}\n\n`;
+    if (execution.actual_result) content += `## Resultado Obtido\n${execution.actual_result}\n\n`;
+    if (execution.notes) content += `## Notas\n${execution.notes}\n\n`;
   }
-  
+
   if (type === 'defect') {
     const defect = item as Defect;
-    content += `## Status\n${translateStatus(defect.status)}\n\n`;
-    
-    if ('severity' in defect && defect.severity) {
-      content += `**Severidade:** ${priorityLabel(defect.severity as any)}\n\n`;
-    }
-    
-    if ('priority' in defect && defect.priority) {
-      content += `**Prioridade:** ${priorityLabel(defect.priority as any)}\n\n`;
-    }
-    
-    if ('steps_to_reproduce' in defect && defect.steps_to_reproduce) {
-      content += `## Passos para Reproduzir\n${toMarkdownListOrParagraph(defect.steps_to_reproduce as string)}\n\n`;
-    }
-    
-    if ('expected_behavior' in defect && defect.expected_behavior) {
-      content += `## Comportamento Esperado\n${toMarkdownListOrParagraph(defect.expected_behavior as string)}\n\n`;
-    }
-    
-    if ('actual_behavior' in defect && defect.actual_behavior) {
-      content += `## Comportamento Atual\n${toMarkdownListOrParagraph(defect.actual_behavior as string)}\n\n`;
-    }
-    
-    content += `**Data de Criação:** ${new Date(defect.created_at).toLocaleDateString()}\n\n`;
-  }
-  
-  if (type === 'requirement') {
-    const requirement = item as Requirement;
-    content += `## Status\n${translateStatus(requirement.status)}\n\n`;
-    
-    if ('type' in requirement && requirement.type) {
-      content += `**Tipo:** ${requirement.type}\n\n`;
-    }
-    
-    if ('priority' in requirement && requirement.priority) {
-      content += `**Prioridade:** ${priorityLabel(requirement.priority as any)}\n\n`;
-    }
-    
-    if ('acceptance_criteria' in requirement && requirement.acceptance_criteria) {
-      content += `## Critérios de Aceitação\n${toMarkdownListOrParagraph(requirement.acceptance_criteria as string)}\n\n`;
-    }
-    
-    content += `**Data de Criação:** ${new Date(requirement.created_at).toLocaleDateString()}\n\n`;
+    content += `**Status:** ${translateStatus(defect.status)}\n\n`;
+    content += `**Severidade:** ${priorityLabel(defect.severity as any)}\n\n`;
+    if (defect.description) content += `## Descrição\n${defect.description}\n\n`;
   }
   
   return content;
@@ -289,11 +231,55 @@ const generateTextContent = (
   title: string,
   description: string
 ): string => {
-  return generateMarkdownContent(item, type, title, description)
-    .replace(/#+\s/g, '')
-    .replace(/\|.*\|/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\n\n+/g, '\n\n');
+  let content = `${title}\n${'='.repeat(title.length)}\n\n`;
+  if (description) {
+    content += `DESCRIÇÃO:\n${toMarkdownListOrParagraph(description)}\n\n`;
+  }
+  
+  if (type === 'plan' && 'objective' in item) {
+    if ((item as any).objective) content += `OBJETIVO:\n${(item as any).objective}\n\n`;
+    if ((item as any).scope) content += `ESCOPO:\n${(item as any).scope}\n\n`;
+    if ((item as any).approach) content += `ABORDAGEM:\n${(item as any).approach}\n\n`;
+    if ((item as any).criteria) content += `CRITÉRIOS:\n${(item as any).criteria}\n\n`;
+    if ((item as any).status) content += `STATUS: ${translateStatus((item as any).status)}\n\n`;
+  }
+  
+  if (type === 'case' && 'steps' in item) {
+    if (item.preconditions) {
+      content += `PRÉ-CONDIÇÕES:\n${item.preconditions}\n\n`;
+    }
+    
+    if (Array.isArray(item.steps) && item.steps.length > 0) {
+      content += `PASSOS DE TESTE:\n`;
+      item.steps.forEach((step: any, index: number) => {
+        content += `${step.order || index + 1}. Ação: ${step.action}\n`;
+        content += `   Resultado: ${step.expected_result}\n\n`;
+      });
+    }
+    
+    if (item.expected_result) {
+      content += `RESULTADO FINAL ESPERADO:\n${item.expected_result}\n\n`;
+    }
+    
+    if (item.priority) {
+      content += `PRIORIDADE: ${priorityLabel((item as any).priority)}\n`;
+    }
+    
+    if (item.type) {
+      content += `TIPO: ${testCaseTypeLabel((item as any).type)}\n`;
+    }
+  }
+  
+  if (type === 'execution') {
+    const execution = item as TestExecution;
+    content += `STATUS: ${executionStatusLabel(execution.status as any)}\n`;
+    if (execution.executed_by) content += `EXECUTOR: ${execution.executed_by}\n`;
+    if (execution.executed_at) content += `DATA: ${new Date(execution.executed_at).toLocaleString('pt-BR')}\n`;
+    if (execution.actual_result) content += `\nRESULTADO OBTIDO:\n${execution.actual_result}\n`;
+    if (execution.notes) content += `\nNOTAS:\n${execution.notes}\n`;
+  }
+  
+  return content;
 };
 
 const generateHTMLContent = (
@@ -312,102 +298,60 @@ const generateHTMLContent = (
     if ((item as any).scope) html += `<h2>Escopo</h2>${toHTMLListOrParagraph((item as any).scope || '')}`;
     if ((item as any).approach) html += `<h2>Abordagem</h2>${toHTMLListOrParagraph((item as any).approach || '')}`;
     if ((item as any).criteria) html += `<h2>Critérios</h2>${toHTMLListOrParagraph((item as any).criteria || '')}`;
-    
-    const branches = (item as any).branches || (item as any).resources;
-    if (branches) {
-      html += `<h2>Branches de Entrega</h2>${toHTMLListOrParagraph(branches)}`;
-    }
+    if ((item as any).resources) html += `<h2>Recursos</h2>${toHTMLListOrParagraph((item as any).resources || '')}`;
+    if ((item as any).schedule) html += `<h2>Cronograma</h2>${toHTMLListOrParagraph((item as any).schedule || '')}`;
+    if ((item as any).risks) html += `<h2>Riscos</h2>${toHTMLListOrParagraph((item as any).risks || '')}`;
+    if ((item as any).status) html += `<p><strong>Status:</strong> ${translateStatus((item as any).status)}</p>`;
   }
   
   if (type === 'case' && 'steps' in item) {
-    if ((item as any).branches) {
-      html += `<p><strong>Branch:</strong> ${(item as any).branches}</p>`;
-    }
-
     if (item.preconditions) {
-      html += `<h2>Pré-condições</h2><p>${item.preconditions}</p>`;
+      html += `<h2>Pré-condições</h2>${toHTMLListOrParagraph(item.preconditions)}`;
     }
     
-    html += `<h2>Passos de Teste</h2><table border="1"><tr><th>Passo</th><th>Ação</th><th>Resultado Esperado</th></tr>`;
-    
-    item.steps?.forEach((step: any, index: number) => {
-      html += `<tr><td>${step.order || index + 1}</td><td>${step.action}</td><td>${step.expected_result}</td></tr>`;
-    });
-    
-    html += `</table>`;
+    if (Array.isArray(item.steps) && item.steps.length > 0) {
+      html += `<h2>Passos de Teste</h2>`;
+      html += `<table>`;
+      html += `<tr><th>Passo</th><th>Ação</th><th>Resultado Esperado</th></tr>`;
+      
+      item.steps.forEach((step: any, index: number) => {
+        html += `<tr>`;
+        html += `<td>${step.order || index + 1}</td>`;
+        html += `<td>${step.action || ''}</td>`;
+        html += `<td>${step.expected_result || ''}</td>`;
+        html += `</tr>`;
+      });
+      
+      html += `</table>`;
+    }
     
     if (item.expected_result) {
-      html += `<h2>Resultado Final Esperado</h2><p>${item.expected_result}</p>`;
+      html += `<h2>Resultado Final Esperado</h2>${toHTMLListOrParagraph(item.expected_result)}`;
     }
-
-    // Metadados traduzidos
-    if ((item as any).priority) {
+    
+    if (item.priority) {
       html += `<p><strong>Prioridade:</strong> ${priorityLabel((item as any).priority)}</p>`;
     }
-    if ((item as any).type) {
+    
+    if (item.type) {
       html += `<p><strong>Tipo:</strong> ${testCaseTypeLabel((item as any).type)}</p>`;
     }
   }
   
   if (type === 'execution') {
     const execution = item as TestExecution;
-    html += `<h2>Status</h2><p>${executionStatusLabel(execution.status as any)}</p>`;
-    
-    if (execution.actual_result) {
-      html += `<h2>Resultado Obtido</h2><p>${execution.actual_result}</p>`;
-    }
-    
-    if (execution.executed_by) {
-      html += `<p><strong>Executado por:</strong> ${execution.executed_by}</p>`;
-    }
-    
-    html += `<p><strong>Data de Execução:</strong> ${execution.executed_at.toLocaleDateString()}</p>`;
+    html += `<p><strong>Status:</strong> ${executionStatusLabel(execution.status as any)}</p>`;
+    if (execution.executed_by) html += `<p><strong>Executor:</strong> ${execution.executed_by}</p>`;
+    if (execution.executed_at) html += `<p><strong>Data da Execução:</strong> ${new Date(execution.executed_at).toLocaleString('pt-BR')}</p>`;
+    if (execution.actual_result) html += `<h2>Resultado Obtido</h2>${toHTMLListOrParagraph(execution.actual_result)}`;
+    if (execution.notes) html += `<h2>Notas</h2>${toHTMLListOrParagraph(execution.notes)}`;
   }
-  
+
   if (type === 'defect') {
     const defect = item as Defect;
-    html += `<h2>Status</h2><p>${translateStatus(defect.status)}</p>`;
-    
-    if ('severity' in defect && defect.severity) {
-      html += `<p><strong>Severidade:</strong> ${priorityLabel(defect.severity as any)}</p>`;
-    }
-    
-    if ('priority' in defect && defect.priority) {
-      html += `<p><strong>Prioridade:</strong> ${priorityLabel(defect.priority as any)}</p>`;
-    }
-    
-    if ('steps_to_reproduce' in defect && defect.steps_to_reproduce) {
-      html += `<h2>Passos para Reproduzir</h2>${toHTMLListOrParagraph(defect.steps_to_reproduce as string)}`;
-    }
-    
-    if ('expected_behavior' in defect && defect.expected_behavior) {
-      html += `<h2>Comportamento Esperado</h2>${toHTMLListOrParagraph(defect.expected_behavior as string)}`;
-    }
-    
-    if ('actual_behavior' in defect && defect.actual_behavior) {
-      html += `<h2>Comportamento Atual</h2>${toHTMLListOrParagraph(defect.actual_behavior as string)}`;
-    }
-    
-    html += `<p><strong>Data de Criação:</strong> ${new Date(defect.created_at).toLocaleDateString()}</p>`;
-  }
-  
-  if (type === 'requirement') {
-    const requirement = item as Requirement;
-    html += `<h2>Status</h2><p>${translateStatus(requirement.status)}</p>`;
-    
-    if ('type' in requirement && requirement.type) {
-      html += `<p><strong>Tipo:</strong> ${requirement.type}</p>`;
-    }
-    
-    if ('priority' in requirement && requirement.priority) {
-      html += `<p><strong>Prioridade:</strong> ${priorityLabel(requirement.priority as any)}</p>`;
-    }
-    
-    if ('acceptance_criteria' in requirement && requirement.acceptance_criteria) {
-      html += `<h2>Critérios de Aceitação</h2>${toHTMLListOrParagraph(requirement.acceptance_criteria as string)}`;
-    }
-    
-    html += `<p><strong>Data de Criação:</strong> ${new Date(requirement.created_at).toLocaleDateString()}</p>`;
+    html += `<p><strong>Status:</strong> ${translateStatus(defect.status)}</p>`;
+    html += `<p><strong>Severidade:</strong> ${priorityLabel(defect.severity as any)}</p>`;
+    if (defect.description) html += `<h2>Descrição</h2>${toHTMLListOrParagraph(defect.description)}`;
   }
   
   return html;
@@ -416,9 +360,9 @@ const generateHTMLContent = (
 const TYPE_PREFIX: Record<string, string> = {
   plan: 'PT',
   case: 'CT',
-  execution: 'EX',
-  requirement: 'RQ',
-  defect: 'DF',
+  execution: 'EXE',
+  requirement: 'REQ',
+  defect: 'DEF',
 };
 
 const getItemTitle = (item: TestPlan | TestCase | TestExecution | Requirement | Defect, type: 'plan' | 'case' | 'execution' | 'requirement' | 'defect'): string => {
@@ -442,11 +386,11 @@ const getItemDescription = (item: TestPlan | TestCase | TestExecution | Requirem
 const getFilename = (item: TestPlan | TestCase | TestExecution | Requirement | Defect, type: 'plan' | 'case' | 'execution' | 'requirement' | 'defect', format: ExportFormat): string => {
   const title = getItemTitle(item, type);
   const sanitizedTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
-  return `${sanitizedTitle}.${format}`;
+  const ext = format === 'word' ? 'doc' : format;
+  return `${sanitizedTitle}.${ext}`;
 };
 
 const exportToPDF = async (content: string, filename: string) => {
-  // Para PDF, vamos criar um HTML e usar a API de impressão do navegador
   const printWindow = window.open('', '_blank');
   if (printWindow) {
     printWindow.document.write(`
@@ -459,22 +403,20 @@ const exportToPDF = async (content: string, filename: string) => {
             @page { size: A4; margin: 15mm; }
             html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; font-size: 13px; color: #1a1a1a; line-height: 1.5; }
-            h1 { color: #00c2a8; margin: 0 0 16px 0; font-size: 24px; border-bottom: 2px solid #00c2a8; padding-bottom: 8px; page-break-after: avoid; }
-            h2 { color: #333; margin: 24px 0 12px 0; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 4px; page-break-after: avoid; }
-            hr { border: 0; border-top: 1px solid #eee; margin: 16px 0; }
-            table { border-collapse: collapse; width: 100%; margin: 16px 0 24px 0; table-layout: auto; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-            th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; vertical-align: top; }
+            h1 { color: #00c2a8; margin: 0 0 16px 0; font-size: 22px; border-bottom: 2px solid #00c2a8; padding-bottom: 8px; }
+            h2 { color: #333; margin: 20px 0 10px 0; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+            table { border-collapse: collapse; width: 100%; margin: 14px 0 20px 0; table-layout: auto; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; vertical-align: top; }
             th { background-color: #f9fafb; font-weight: 600; color: #374151; }
             tr:nth-child(even) { background-color: #f9fafb; }
-            tr { page-break-inside: avoid; }
-            p { margin: 0 0 8px 0; white-space: pre-wrap; }
-            ul, ol { margin: 0 0 16px 24px; padding: 0; }
-            li { margin: 6px 0; }
+            p { margin: 0 0 8px 0; }
+            ul, ol { margin: 0 0 14px 20px; padding: 0; }
+            li { margin: 4px 0; }
             strong { color: #111; }
           </style>
         </head>
         <body>
-          <p style="font-size:11px;color:#555;margin:0 0 8px 0">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+          <p style="font-size:11px;color:#777;margin:0 0 12px 0">Exportado via Nexus TCMS • ${new Date().toLocaleString('pt-BR')}</p>
           ${content}
         </body>
       </html>
@@ -489,8 +431,43 @@ const exportToPDF = async (content: string, filename: string) => {
   }
 };
 
-const downloadTextFile = (content: string, filename: string) => {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+const downloadWordFile = (content: string, filename: string) => {
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset="utf-8">
+        <title>${filename}</title>
+        <style>
+          body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.4; color: #333; }
+          h1 { color: #008080; font-size: 18pt; border-bottom: 2px solid #008080; padding-bottom: 4px; }
+          h2 { color: #2E4053; font-size: 13pt; margin-top: 14pt; border-bottom: 1px solid #ddd; }
+          p { margin: 6pt 0; }
+          ul, ol { margin: 6pt 0 6pt 20pt; }
+          table { border-collapse: collapse; width: 100%; margin: 10pt 0; }
+          th, td { border: 1px solid #ccc; padding: 6pt 8pt; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <p style="font-size:9pt;color:#888;">Nexus TCMS • Exportação de Item • ${new Date().toLocaleString('pt-BR')}</p>
+        ${content}
+      </body>
+    </html>
+  `;
+  const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const downloadTextFile = (content: string, filename: string, mimeType = 'text/plain;charset=utf-8') => {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Calendar, Sparkles, Loader2, ClipboardList, Link2, Bug as BugIcon, ChevronDown, ChevronLeft, ChevronRight, Download, Info, Image as ImageIcon } from 'lucide-react';
+import { 
+  Edit, Trash2, Calendar, Sparkles, Loader2, ClipboardList, 
+  Link2, Bug as BugIcon, ChevronDown, ChevronLeft, ChevronRight, 
+  Download, Info, Image as ImageIcon, FlaskConical, PlayCircle, 
+  CheckCircle2, Clock 
+} from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TestPlan, TestCase, TestExecution, Requirement, Defect } from '@/types';
 import { ExportDropdown } from './ExportDropdown';
@@ -1052,31 +1057,42 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3 bg-muted/20 p-2 px-3 rounded-xl border border-border/40 backdrop-blur-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3 bg-muted/30 p-2 px-3 rounded-xl border border-border/50 backdrop-blur-sm">
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Type Badge */}
+              {('type' in item && (item as any).type) && (
+                <Badge className={cn("px-2.5 py-0.5 rounded-md text-xs font-semibold shadow-2xs", testCaseTypeBadgeClass((item as any).type as TestCaseType))}>
+                  {testCaseTypeLabel((item as any).type as TestCaseType)}
+                </Badge>
+              )}
+
+              {/* Status Badge */}
               {('status' in item && item.status) && (
-                <Badge className={
+                <Badge className={cn(
+                  "px-2.5 py-0.5 rounded-md text-xs font-semibold shadow-2xs",
                   type === 'execution' ? executionStatusBadgeClass(item.status as ExecutionStatus)
                   : type === 'requirement' ? requirementStatusBadgeClass(item.status as any)
                   : type === 'defect' ? defectStatusBadgeClass(item.status as any)
                   : planStatusClasses(item.status as string)
-                }>
+                )}>
                   {type === 'execution' ? executionStatusLabel(item.status as ExecutionStatus)
                   : type === 'requirement' ? requirementStatusLabel(item.status as any)
                   : type === 'defect' ? defectStatusLabel(item.status as any)
                   : translateStatus(item.status as string)}
                 </Badge>
               )}
+
+              {/* Priority Badge */}
               {('priority' in item && (item as any).priority) && (
-                <Badge className={priorityBadgeClass((item as any).priority)} variant="secondary">
+                <Badge className={cn("px-2.5 py-0.5 rounded-md text-xs font-semibold shadow-2xs", priorityBadgeClass((item as any).priority))} variant="secondary">
                   {priorityLabel((item as any).priority)}
                 </Badge>
               )}
             </div>
 
             {allTeamMembers.length > 0 && (
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest hidden sm:inline">
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider hidden sm:inline">
                   Equipe
                 </span>
                 <TeamAvatars
@@ -1260,33 +1276,43 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
             <div className="space-y-4">
               {item.preconditions && (
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">Pré-condições</h3>
-                  {renderListOrParagraph(item.preconditions)}
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Pré-condições</h3>
+                  <div className="text-xs text-foreground leading-relaxed">
+                    {renderListOrParagraph(item.preconditions)}
+                  </div>
                 </div>
               )}
               <div>
-                <h3 className="text-sm font-semibold text-foreground mb-2">Passos</h3>
-                <div className="space-y-2">
-                  {item.steps?.map((step: any, index: number) => (
-                    <div key={index} className="rounded-lg border border-border bg-muted/30 p-3">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                        Passo {step.order || index + 1}
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Passos</h3>
+                {Array.isArray(item.steps) && item.steps.length > 0 ? (
+                  <div className="space-y-2">
+                    {item.steps.map((step: any, index: number) => (
+                      <div key={index} className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-1">
+                        <div className="text-[11px] font-bold text-brand uppercase tracking-wider">
+                          Passo {step.order || index + 1}
+                        </div>
+                        <div className="text-xs text-foreground"><strong className="font-semibold text-muted-foreground">Ação: </strong>{step.action || '—'}</div>
+                        <div className="text-xs text-muted-foreground"><strong className="font-semibold text-muted-foreground">Resultado esperado: </strong>{step.expected_result || '—'}</div>
                       </div>
-                      <div className="text-sm"><span className="font-medium">Ação: </span><span className="text-muted-foreground">{step.action}</span></div>
-                      <div className="text-sm mt-0.5"><span className="font-medium">Resultado esperado: </span><span className="text-muted-foreground">{step.expected_result}</span></div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic bg-muted/10 p-3 rounded-lg border border-border/40">
+                    Nenhum passo a passo detalhado cadastrado para este caso.
+                  </p>
+                )}
               </div>
               {item.expected_result && (
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">Resultado Final Esperado</h3>
-                  {renderListOrParagraph(item.expected_result)}
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Resultado Final Esperado</h3>
+                  <div className="text-xs text-foreground leading-relaxed">
+                    {renderListOrParagraph(item.expected_result)}
+                  </div>
                 </div>
               )}
               {branchTokens.length > 0 && (
-                <div className="rounded-lg border border-border/50 bg-muted/20 p-3.5">
-                  <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-3.5">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full inline-block" style={{ backgroundColor: currentProject?.color || 'var(--brand)' }} />
                     Branch
                   </h3>
@@ -1320,12 +1346,16 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
               )}
             </div>
             );
-          })()}          {type === 'execution' && 'actual_result' in item && (
+          })()}
+
+          {type === 'execution' && 'actual_result' in item && (
             <div className="space-y-4">
               {item.actual_result && (
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">Resultado Obtido</h3>
-                  {renderListOrParagraph(item.actual_result)}
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Resultado Obtido</h3>
+                  <div className="text-xs text-foreground leading-relaxed">
+                    {renderListOrParagraph(item.actual_result)}
+                  </div>
                 </div>
               )}
             </div>
@@ -1336,13 +1366,13 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
               <div className="grid grid-cols-2 gap-4 bg-muted/20 border border-border/40 rounded-xl p-3.5">
                 <div>
                   <span className="text-xs text-muted-foreground block mb-0.5">Severidade</span>
-                  <span className={cn("px-2 py-0.5 rounded text-xs font-semibold inline-block", priorityBadgeClass(item.severity as any))}>
+                  <span className={cn("px-2.5 py-0.5 rounded-md text-xs font-semibold inline-block", priorityBadgeClass(item.severity as any))}>
                     {priorityLabel(item.severity as any)}
                   </span>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground block mb-0.5">Status</span>
-                  <span className={cn("px-2 py-0.5 rounded text-xs font-semibold inline-block", defectStatusBadgeClass(item.status as any))}>
+                  <span className={cn("px-2.5 py-0.5 rounded-md text-xs font-semibold inline-block", defectStatusBadgeClass(item.status as any))}>
                     {defectStatusLabel(item.status as any)}
                   </span>
                 </div>
@@ -1353,16 +1383,17 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
           {/* Vínculos para Requisito — casos vinculados */}
           {type === 'requirement' && linkedCases.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">Casos Vinculados</h3>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Casos Vinculados</h3>
               <div className="flex flex-wrap gap-1.5">
                 {linkedCases.map(c => (
                   <Link
                     key={c.id}
                     to={`/cases?id=${c.id}`}
-                    className="text-xs bg-brand/10 text-brand px-2 py-0.5 rounded font-mono hover:bg-brand/20 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/80 hover:bg-brand/10 border border-border/70 hover:border-brand/40 text-xs font-mono font-bold text-brand transition-all shadow-2xs"
                     onClick={handleClose}
                   >
-                    {c.sequence != null ? `CT-${String(c.sequence).padStart(3, '0')}` : c.title}
+                    <FlaskConical className="h-3.5 w-3.5 text-brand shrink-0" />
+                    <span>{c.sequence != null ? `CT-${String(c.sequence).padStart(3, '0')}` : c.title}</span>
                   </Link>
                 ))}
               </div>
@@ -1376,57 +1407,63 @@ export const DetailModal = ({ isOpen, onClose, item, type, onEdit, onDelete }: D
             ('execution_id' in item && (item as any).execution_id) ||
             (type === 'case' && linkedReqs.length > 0)) && (
             <div>
-              <h3 className="text-sm font-semibold text-foreground mb-2">Vínculos</h3>
-              <div className="space-y-1.5">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Vínculos</h3>
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                 {'plan_id' in item && (item as any).plan_id && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <ClipboardList className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="font-medium text-foreground">Plano de Teste:</span>{' '}
-                    <Link to={`/plans?id=${(item as any).plan_id}`} className="text-brand hover:underline" onClick={handleClose}>
-                      {linkedPlan
-                        ? (linkedPlan.sequence != null ? `PT-${String(linkedPlan.sequence).padStart(3, '0')} — ${linkedPlan.title || ''}` : linkedPlan.title || (item as any).plan_id)
-                        : (item as any).plan_id}
-                    </Link>
-                  </div>
-                )}
-                {type === 'case' && linkedReqs.length > 0 && (
-                  <div className="flex items-start gap-2 text-sm">
-                    <Link2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-medium text-foreground">Requisitos vinculados:</span>{' '}
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {linkedReqs.map(r => (
-                          <Link
-                            key={r.id}
-                            to={`/management?tab=requirements&id=${r.id}&modal=req:view`}
-                            className="text-xs bg-brand/10 text-brand px-2 py-0.5 rounded font-mono hover:bg-brand/20 transition-colors"
-                            onClick={handleClose}
-                          >
-                            {r.sequence != null ? `REQ-${String(r.sequence).padStart(3, '0')}` : r.title}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <Link 
+                    to={`/plans?id=${(item as any).plan_id}`} 
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/80 hover:bg-brand/10 border border-border/70 hover:border-brand/40 transition-all text-xs text-foreground group shadow-2xs" 
+                    onClick={handleClose}
+                  >
+                    <ClipboardList className="h-4 w-4 text-brand shrink-0" />
+                    <span className="font-mono font-bold text-brand">
+                      {linkedPlan?.sequence != null ? `PT-${String(linkedPlan.sequence).padStart(3, '0')}` : 'PT-001'}
+                    </span>
+                    <span className="text-foreground group-hover:text-brand font-medium truncate max-w-xs">
+                      {linkedPlan?.title ? `— ${linkedPlan.title}` : ''}
+                    </span>
+                  </Link>
                 )}
                 {'case_id' in item && (item as any).case_id && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="font-medium text-foreground">Caso de Teste:</span>{' '}
-                    <Link to={`/cases?id=${(item as any).case_id}`} className="text-brand hover:underline" onClick={handleClose}>
-                      {linkedCase
-                        ? (linkedCase.sequence != null ? `CT-${String(linkedCase.sequence).padStart(3, '0')} — ${linkedCase.title || ''}` : linkedCase.title || (item as any).case_id)
-                        : (item as any).case_id}
-                    </Link>
-                  </div>
+                  <Link 
+                    to={`/cases?id=${(item as any).case_id}`} 
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/80 hover:bg-brand/10 border border-border/70 hover:border-brand/40 transition-all text-xs text-foreground group shadow-2xs" 
+                    onClick={handleClose}
+                  >
+                    <FlaskConical className="h-4 w-4 text-brand shrink-0" />
+                    <span className="font-mono font-bold text-brand">
+                      {linkedCase?.sequence != null ? `CT-${String(linkedCase.sequence).padStart(3, '0')}` : 'CT-001'}
+                    </span>
+                    <span className="text-foreground group-hover:text-brand font-medium truncate max-w-xs">
+                      {linkedCase?.title ? `— ${linkedCase.title}` : ''}
+                    </span>
+                  </Link>
                 )}
                 {'execution_id' in item && (item as any).execution_id && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <PlayCircle className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="font-medium text-foreground">Execução Vinculada:</span>{' '}
-                    <Link to={`/executions?id=${(item as any).execution_id}`} className="text-brand hover:underline" onClick={handleClose}>
+                  <Link 
+                    to={`/executions?id=${(item as any).execution_id}`} 
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/80 hover:bg-brand/10 border border-border/70 hover:border-brand/40 transition-all text-xs text-foreground group shadow-2xs" 
+                    onClick={handleClose}
+                  >
+                    <PlayCircle className="h-4 w-4 text-brand shrink-0" />
+                    <span className="font-mono font-bold text-brand">
                       EXE-{(item as any).execution_id.slice(0, 8)}
-                    </Link>
+                    </span>
+                  </Link>
+                )}
+                {type === 'case' && linkedReqs.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {linkedReqs.map(r => (
+                      <Link
+                        key={r.id}
+                        to={`/management?tab=requirements&id=${r.id}&modal=req:view`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-card/80 hover:bg-brand/10 border border-border/70 hover:border-brand/40 text-xs font-mono font-bold text-brand transition-all shadow-2xs"
+                        onClick={handleClose}
+                      >
+                        <Link2 className="h-3.5 w-3.5 text-brand shrink-0" />
+                        <span>{r.sequence != null ? `REQ-${String(r.sequence).padStart(3, '0')}` : r.title}</span>
+                      </Link>
+                    ))}
                   </div>
                 )}
               </div>
