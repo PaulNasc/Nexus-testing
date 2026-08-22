@@ -875,18 +875,26 @@ export const AIBatchGeneratorForm = ({ onSuccess, type = 'plan', mode = 'standar
           <Button
             type="submit"
             disabled={loading || !documentContent.trim() || !currentProject?.id}
-            className="w-full h-12 bg-brand hover:bg-brand/90 text-white font-bold shadow-lg shadow-brand/20 transition-all hover:scale-[1.02] active:scale-[0.98] gap-2"
+            className={cn(
+              "w-full h-11 text-xs font-bold tracking-wide rounded-lg transition-all shadow-xs flex items-center justify-center gap-2",
+              loading ? "opacity-80" : "bg-brand hover:bg-brand/90 text-white"
+            )}
             aria-busy={loading}
           >
             {loading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                <span>Processando IA...</span>
+              </>
             ) : (
-              <Sparkles className="h-5 w-5" />
-            )}
-            {loading ? 'Processando...' : (
-              mode === 'plan-with-cases' && type === 'plan'
-                ? 'Gerar Plano com Casos'
-                : `Gerar ${type === 'case' ? 'Casos' : 'Planos'} com IA`
+              <>
+                <Sparkles className="h-4 w-4 mr-1 text-white" />
+                <span>
+                  {mode === 'plan-with-cases' && type === 'plan'
+                    ? 'Gerar Plano com Casos'
+                    : `Gerar ${type === 'case' ? 'Casos' : 'Planos'} com IA`}
+                </span>
+              </>
             )}
           </Button>
       </div>

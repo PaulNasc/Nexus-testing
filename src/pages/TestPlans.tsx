@@ -12,7 +12,8 @@ import {
   Plus, Search, ListFilter, ArrowUpDown, Edit, Trash2, 
   Sparkles, Download, Calendar, FileText, FileSpreadsheet, 
   FileCode2, Copy, FileCheck2, Table, AlertTriangle, 
-  FlaskConical, Play, Bug, ShieldAlert 
+  FlaskConical, Play, Bug, ShieldAlert, Percent, 
+  CheckCircle2, FileStack, Clock 
 } from 'lucide-react';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { UserAvatar } from '@/components/ui/UserAvatar';
@@ -507,30 +508,43 @@ export const TestPlans = () => {
     );
   }
 
+  const stats = useMemo(() => {
+    const total = plans.length;
+    const active = plans.filter(p => p.status === 'active').length;
+    const draft = plans.filter(p => p.status === 'draft').length;
+    const completed = plans.filter(p => p.status === 'completed').length;
+    let sumPct = 0;
+    plans.forEach(p => { sumPct += planProgress(p.id); });
+    const avgProgress = total > 0 ? Math.round(sumPct / total) : 0;
+    return { total, active, draft, completed, avgProgress };
+  }, [plans, planStats]);
+
   return (
-    <div ref={containerRef} className="flex-1 space-y-5 p-6 animate-page-enter">
+    <div ref={containerRef} className="flex-1 space-y-5 p-6 max-w-[1600px] mx-auto animate-page-enter">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/40">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
         <div>
           <h1 className="text-xl font-bold text-foreground tracking-tight">Planos de Teste</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Gerencie seus planos de teste, escopos e estratégias de validação</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Gerencie seus planos de teste, escopos, governança e estratégias de validação
+          </p>
         </div>
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
-            className="h-9 px-3 rounded-lg border-brand/30 bg-brand/5 hover:bg-brand/10 text-brand font-semibold text-xs gap-1.5 shadow-2xs"
-            title="Gerar Plano com IA"
+            className="h-9 gap-1.5 px-3 rounded-lg border-border/70 bg-card/60 hover:bg-muted/60 text-xs font-semibold shadow-2xs transition-all"
             disabled={!currentProject || currentProject.status !== 'active'}
             onClick={() => setShowAIModal(true)}
           >
-            <Sparkles className="h-3.5 w-3.5 text-brand" />
-            <span className="hidden sm:inline">Gerar com IA</span>
+            <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+            <span>Gerar com IA</span>
           </Button>
           
-          <Button
+          <StandardButton
+            variant="brand"
             size="sm"
-            className="h-9 px-4 rounded-lg bg-brand hover:bg-brand/90 text-white font-semibold text-xs gap-1.5 shadow-xs transition-all active:scale-[0.98]"
+            className="h-9 gap-1.5 px-3.5 rounded-lg text-xs font-semibold shadow-xs"
             onClick={() => {
               setShowForm(true);
               setEditingPlan(null);
@@ -542,11 +556,56 @@ export const TestPlans = () => {
             disabled={!currentProject || currentProject.status !== 'active'}
             title={!currentProject ? 'Selecione um projeto ativo para criar planos' : (currentProject.status !== 'active' ? 'Projeto não ativo — criação desabilitada' : undefined)}
           >
-            <Plus className="h-4 w-4" />
-            <span>Novo Plano de Teste</span>
-          </Button>
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Plano de Teste
+          </StandardButton>
         </div>
       </div>
+
+      {/* Market Leader KPI Bar */}
+      {plans.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="rounded-xl border border-border/70 bg-card/60 p-3 flex flex-col justify-between shadow-2xs">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Total de Planos</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-lg font-bold text-foreground">{stats.total}</span>
+              <FileStack className="h-4 w-4 text-muted-foreground/60" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-brand/30 bg-brand/5 p-3 flex flex-col justify-between shadow-2xs">
+            <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Progresso Médio</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-lg font-bold text-brand">{stats.avgProgress}%</span>
+              <Percent className="h-4 w-4 text-brand/60" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 flex flex-col justify-between shadow-2xs">
+            <span className="text-[11px] font-bold text-emerald-500 uppercase tracking-wider">Ativos</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-lg font-bold text-emerald-500">{stats.active}</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-500/60" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 flex flex-col justify-between shadow-2xs">
+            <span className="text-[11px] font-bold text-blue-500 uppercase tracking-wider">Rascunhos</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-lg font-bold text-blue-500">{stats.draft}</span>
+              <Clock className="h-4 w-4 text-blue-500/60" />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-3 flex flex-col justify-between shadow-2xs col-span-2 sm:col-span-1">
+            <span className="text-[11px] font-bold text-purple-500 uppercase tracking-wider">Concluídos</span>
+            <div className="flex items-baseline justify-between mt-1">
+              <span className="text-lg font-bold text-purple-500">{stats.completed}</span>
+              <CheckCircle2 className="h-4 w-4 text-purple-500/60" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toolbar / Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
