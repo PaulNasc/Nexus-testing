@@ -236,7 +236,26 @@ CREATE TABLE IF NOT EXISTS api_keys (
   PRIMARY KEY (user_id, provider, model_id)
 );
 
+-- Relatorios de erro e telemetria enviados pelo widget de observabilidade
+CREATE TABLE IF NOT EXISTS error_reports (
+  id TEXT PRIMARY KEY,
+  error_message TEXT NOT NULL,
+  stack_trace TEXT,
+  current_url TEXT,
+  console_logs TEXT DEFAULT '[]',
+  screenshot_data TEXT,
+  user_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
+  project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+  organization_id TEXT REFERENCES organizations(id) ON DELETE SET NULL,
+  user_agent TEXT,
+  status TEXT DEFAULT 'open',
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Indexes
+CREATE INDEX IF NOT EXISTS idx_error_reports_user ON error_reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_error_reports_project ON error_reports(project_id);
+CREATE INDEX IF NOT EXISTS idx_error_reports_status ON error_reports(status);
 CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_test_plans_project ON test_plans(project_id);
 CREATE INDEX IF NOT EXISTS idx_test_cases_plan ON test_cases(plan_id);

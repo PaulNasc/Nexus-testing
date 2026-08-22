@@ -31,6 +31,9 @@
     "db:bootstrap": "node server/scripts/bootstrap-local-db.js",
     "db:reset-password": "node server/scripts/reset-password.mjs",
     "test:e2e": "playwright test",
+    "test:robot": "node scripts/test-runner.js",
+    "audit:security": "node scripts/security-audit.js",
+    "deploy:gate": "node scripts/deploy-gate.js",
     "validate": "node scripts/validate-app.js"
   },
   "dependencies": {

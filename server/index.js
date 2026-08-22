@@ -14,6 +14,7 @@ import { getClient, db, query, transaction } from './db.js';
 import { encrypt as encryptSecret, decrypt as decryptSecret } from './lib/crypto.js';
 import { validateRow, canTransitionDefect, canTransitionRequirement, canTransitionRun } from './lib/validation.js';
 import { logger } from './lib/logger.js';
+import { wafMiddleware, createRateLimiter } from './lib/waf.js';
 import JSZip from 'jszip';
 import { DOMParser } from '@xmldom/xmldom';
 import mammoth from 'mammoth';
@@ -79,49 +80,31 @@ app.use(cors({
   credentials: true,
 }));
 
-// Headers de seguranca basicos (sem dependencia externa)
+// Headers de seguranca avancados (Strict HSTS, CSP, Anti-Clickjacking, Nosniff)
 app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
+
+// Firewall de Aplicacao Web (WAF) & Bot Mitigation
+app.use(wafMiddleware);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use('/uploads', express.static(uploadsDir));
 
-// Rate limit simples em memoria para rotas de autenticacao
-const authAttempts = new Map(); // key: ip, value: { count, resetAt }
-const AUTH_LIMIT = Number(process.env.AUTH_RATE_LIMIT || 10);
-const AUTH_WINDOW_MS = Number(process.env.AUTH_RATE_WINDOW_MS || 15 * 60 * 1000);
+// Rate limiters dedicados por criticidade
+const authRateLimit = createRateLimiter({ limit: Number(process.env.AUTH_RATE_LIMIT || 15), windowMs: 15 * 60 * 1000, name: 'auth' });
+const generalRateLimit = createRateLimiter({ limit: 300, windowMs: 60 * 1000, name: 'general' });
+const errorReportRateLimit = createRateLimiter({ limit: 30, windowMs: 60 * 1000, name: 'error-reports' });
 
-function authRateLimit(req, res, next) {
-  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-  const now = Date.now();
-  const entry = authAttempts.get(ip);
-  if (!entry || entry.resetAt < now) {
-    authAttempts.set(ip, { count: 1, resetAt: now + AUTH_WINDOW_MS });
-    return next();
-  }
-  entry.count += 1;
-  if (entry.count > AUTH_LIMIT) {
-    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-    res.setHeader('Retry-After', String(retryAfter));
-    return res.status(429).json({ error: { message: 'Muitas tentativas. Tente novamente em ' + retryAfter + 's.' } });
-  }
-  next();
-}
-
-// Limpeza periodica do mapa de tentativas
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of authAttempts.entries()) {
-    if (entry.resetAt < now) authAttempts.delete(ip);
-  }
-}, 5 * 60 * 1000).unref?.();
+app.use('/api', generalRateLimit);
 
 const storage = multer.diskStorage({
   destination: async (_req, _file, cb) => cb(null, uploadsDir),
@@ -136,7 +119,8 @@ const ALLOWED_TABLES = new Set([
   'profiles', 'user_permissions', 'projects', 'test_plans', 'test_cases',
   'test_executions', 'test_runs', 'requirements', 'requirements_cases', 'defects',
   'activity_logs', 'user_settings', 'notifications', 'notification_preferences',
-  'profile_function_roles', 'role_requests', 'groups', 'group_members', 'api_keys'
+  'profile_function_roles', 'role_requests', 'groups', 'group_members', 'api_keys',
+  'error_reports'
 ]);
 
 const BOOL_PERM_COLS = [
@@ -453,6 +437,20 @@ function getNextSequence(table, projectId = null) {
       role TEXT DEFAULT 'member',
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(group_id, user_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS error_reports (
+      id TEXT PRIMARY KEY,
+      error_message TEXT NOT NULL,
+      stack_trace TEXT,
+      current_url TEXT,
+      console_logs TEXT DEFAULT '[]',
+      screenshot_data TEXT,
+      user_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      organization_id TEXT REFERENCES organizations(id) ON DELETE SET NULL,
+      user_agent TEXT,
+      status TEXT DEFAULT 'open',
+      created_at TEXT DEFAULT (datetime('now'))
     )`
   ];
   for (const sql of extraTables) {
