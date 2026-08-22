@@ -273,6 +273,17 @@ export const TestPlans = () => {
     return Math.min(100, Math.round((s.execs / s.cases) * 100));
   };
 
+  const stats = useMemo(() => {
+    const total = plans.length;
+    const active = plans.filter(p => p.status === 'active').length;
+    const draft = plans.filter(p => p.status === 'draft').length;
+    const completed = plans.filter(p => p.status === 'completed').length;
+    let sumPct = 0;
+    plans.forEach(p => { sumPct += planProgress(p.id); });
+    const avgProgress = total > 0 ? Math.round(sumPct / total) : 0;
+    return { total, active, draft, completed, avgProgress };
+  }, [plans, planStats]);
+
   // Derived pagination data
   const totalItems = filteredAndSortedPlans.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -503,21 +514,10 @@ export const TestPlans = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
       </div>
     );
   }
-
-  const stats = useMemo(() => {
-    const total = plans.length;
-    const active = plans.filter(p => p.status === 'active').length;
-    const draft = plans.filter(p => p.status === 'draft').length;
-    const completed = plans.filter(p => p.status === 'completed').length;
-    let sumPct = 0;
-    plans.forEach(p => { sumPct += planProgress(p.id); });
-    const avgProgress = total > 0 ? Math.round(sumPct / total) : 0;
-    return { total, active, draft, completed, avgProgress };
-  }, [plans, planStats]);
 
   return (
     <div ref={containerRef} className="flex-1 space-y-5 p-6 max-w-[1600px] mx-auto animate-page-enter">
