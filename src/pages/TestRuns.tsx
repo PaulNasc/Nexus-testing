@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,7 +18,11 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import SearchableCombobox from '@/components/SearchableCombobox';
-import { Plus, Search, ListFilter, ArrowUpDown, Edit, Trash2, Calendar, Repeat } from 'lucide-react';
+import { 
+  Plus, Search, ListFilter, ArrowUpDown, Edit, Trash2, Calendar, 
+  Repeat, Layers, PlayCircle, CheckCircle2, Clock, XCircle, AlertCircle, 
+  MoreVertical, ClipboardList
+} from 'lucide-react';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { ViewModeToggle } from '@/components/ViewModeToggle';
@@ -44,6 +48,13 @@ const STATUS_LABEL: Record<TestRunStatus, string> = {
   in_progress: 'Em andamento',
   completed: 'Concluído',
   aborted: 'Abortado',
+};
+
+const STATUS_ICON: Record<TestRunStatus, React.ElementType> = {
+  planned: Clock,
+  in_progress: PlayCircle,
+  completed: CheckCircle2,
+  aborted: XCircle,
 };
 
 interface RunFormState {
@@ -143,6 +154,36 @@ export const TestRuns = () => {
     loadRuns();
   }, [loadRuns]);
 
+  // Statistics for Market Leader KPI Bar
+  const stats = useMemo(() => {
+    const total = runs.length;
+    const inProgress = runs.filter(r => r.status === 'in_progress').length;
+    const completed = runs.filter(r => r.status === 'completed').length;
+    const planned = runs.filter(r => r.status === 'planned').length;
+    const aborted = runs.filter(r => r.status === 'aborted').length;
+
+    let totalProgressSum = 0;
+    let runsWithProgress = 0;
+    runs.forEach(r => {
+      const prog = progressMap[r.id];
+      if (prog && prog.totals.total > 0) {
+        totalProgressSum += prog.completionRate;
+        runsWithProgress++;
+      }
+    });
+
+    const avgProgress = runsWithProgress > 0 ? Math.round((totalProgressSum / runsWithProgress) * 100) : 0;
+
+    return {
+      total,
+      inProgress,
+      completed,
+      planned,
+      aborted,
+      avgProgress,
+    };
+  }, [runs, progressMap]);
+
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     let list = runs;
@@ -165,7 +206,10 @@ export const TestRuns = () => {
 
   const planTitleById = useMemo(() => {
     const map: Record<string, string> = {};
-    plans.forEach((p) => { map[p.id] = p.title; });
+    plans.forEach((p) => { 
+      const seq = p.sequence != null ? `PT-${String(p.sequence).padStart(3, '0')} — ` : '';
+      map[p.id] = `${seq}${p.title}`; 
+    });
     return map;
   }, [plans]);
 
@@ -253,10 +297,10 @@ export const TestRuns = () => {
     const total = prog?.totals.total || 0;
     const pct = prog ? Math.round(prog.completionRate * 100) : 0;
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Progresso</span>
-          <span>{total > 0 ? `${pct}% • ${total} execuções` : '—'}</span>
+          <span className="font-medium text-foreground">Progresso</span>
+          <span>{total > 0 ? `${pct}% • ${total} execuções` : 'Sem execuções'}</span>
         </div>
         <div className="h-1.5 bg-muted rounded-full overflow-hidden">
           <div
@@ -269,177 +313,271 @@ export const TestRuns = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6 animate-slide-up">
+    <div className="flex-1 space-y-6 p-6 animate-slide-up">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">
-            Ciclos de Execução
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <Repeat className="h-6 w-6 text-brand" />
+            Ciclos de Teste
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Agrupa execuções por sprint, release ou janela de testes.
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Agrupamento estruturado de execuções para iterações, releases e sprints.
           </p>
         </div>
         {canManage && currentProject && !isProjectInactive && (
           <StandardButton variant="brand" onClick={handleOpenCreate}>
-            <Plus className="h-4 w-4 mr-2" /> Novo ciclo
+            <Plus className="h-4 w-4 mr-2" /> Novo Ciclo de Teste
           </StandardButton>
         )}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por título, descrição ou ID…"
-            className="pl-8"
-          />
+      {/* Market Leader KPI Bar */}
+      {currentProject && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm">
+            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+              <span>Total de Ciclos</span>
+              <Layers className="h-4 w-4 text-brand/70" />
+            </div>
+            <div className="text-2xl font-bold text-foreground mt-1">{stats.total}</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm">
+            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+              <span>Progresso Médio</span>
+              <PlayCircle className="h-4 w-4 text-brand/70" />
+            </div>
+            <div className="text-2xl font-bold text-foreground mt-1">{stats.avgProgress}%</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm">
+            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+              <span>Em Andamento</span>
+              <span className="h-2 w-2 rounded-full bg-blue-500" />
+            </div>
+            <div className="text-2xl font-bold text-blue-500 mt-1">{stats.inProgress}</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm">
+            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+              <span>Concluídos</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            </div>
+            <div className="text-2xl font-bold text-emerald-500 mt-1">{stats.completed}</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm">
+            <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+              <span>Planejados</span>
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+            </div>
+            <div className="text-2xl font-bold text-amber-500 mt-1">{stats.planned}</div>
+          </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <ListFilter className="h-4 w-4 mr-1.5" />
-              {filterStatus === 'all' ? 'Status' : STATUS_LABEL[filterStatus]}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setFilterStatus('all')}>Todos</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {(['planned', 'in_progress', 'completed', 'aborted'] as TestRunStatus[]).map((s) => (
-              <DropdownMenuItem key={s} onClick={() => setFilterStatus(s)}>
-                {STATUS_LABEL[s]}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <ArrowUpDown className="h-4 w-4 mr-1.5" /> Ordenar
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('desc'); }}>ID (desc)</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('asc'); }}>ID (asc)</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('desc'); }}>Mais recentes</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('asc'); }}>Mais antigos</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <div className="ml-auto">
+      )}
+
+      {/* Toolbar & Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card/40 p-3 rounded-xl border border-border/60">
+        <div className="flex items-center gap-2 flex-1 flex-wrap">
+          <div className="relative flex-1 min-w-[220px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por título, descrição ou RUN-XXX…"
+              className="pl-9 h-9 bg-background/50 border-border/70 text-xs"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 text-xs border-border/70 bg-background/50">
+                <ListFilter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                {filterStatus === 'all' ? 'Status: Todos' : `Status: ${STATUS_LABEL[filterStatus]}`}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setFilterStatus('all')}>Todos os Status</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {(['planned', 'in_progress', 'completed', 'aborted'] as TestRunStatus[]).map((s) => {
+                const Icon = STATUS_ICON[s];
+                return (
+                  <DropdownMenuItem key={s} onClick={() => setFilterStatus(s)} className="flex items-center gap-2">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{STATUS_LABEL[s]}</span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Sort Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 text-xs border-border/70 bg-background/50">
+                <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" /> Ordenar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('desc'); }}>ID (Maior primeiro)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setSortBy('sequence'); setSortOrder('asc'); }}>ID (Menor primeiro)</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('desc'); }}>Mais recentes</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setSortBy('created_at'); setSortOrder('asc'); }}>Mais antigos</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="flex items-center gap-3 self-end sm:self-auto">
           <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
         </div>
       </div>
 
-      {/* Empty / loading */}
+      {/* Empty / loading States */}
       {!currentProject && (
-        <Card>
+        <Card className="border-border/60 bg-card/40">
           <CardContent className="py-12 text-center text-muted-foreground">
-            Selecione um projeto para visualizar ciclos.
-          </CardContent>
-        </Card>
-      )}
-      {currentProject && loading && (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent>
-        </Card>
-      )}
-      {currentProject && !loading && filtered.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            {runs.length === 0
-              ? 'Nenhum ciclo criado neste projeto. Crie o primeiro para agrupar execuções.'
-              : 'Nenhum resultado encontrado com os filtros atuais.'}
+            Selecione um projeto ativo para visualizar e gerenciar os ciclos de teste.
           </CardContent>
         </Card>
       )}
 
-      {/* Cards */}
+      {currentProject && loading && (
+        <Card className="border-border/60 bg-card/40">
+          <CardContent className="py-12 text-center text-muted-foreground animate-pulse">
+            Carregando ciclos de execução...
+          </CardContent>
+        </Card>
+      )}
+
+      {currentProject && !loading && filtered.length === 0 && (
+        <Card className="border-border/60 bg-card/40">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            {runs.length === 0
+              ? 'Nenhum ciclo criado neste projeto. Crie o primeiro para agrupar execuções por release ou sprint.'
+              : 'Nenhum ciclo encontrado com os filtros atuais.'}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cards View */}
       {currentProject && !loading && filtered.length > 0 && viewMode === 'cards' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((run) => (
-            <Card
+            <div
               key={run.id}
-              className="border border-border/50 cursor-pointer card-hover flex flex-col"
+              className="rounded-xl border border-border/70 bg-card/60 backdrop-blur-sm p-4 cursor-pointer card-hover flex flex-col justify-between transition-all hover:border-brand/40 shadow-xs"
               onClick={() => handleOpenEdit(run)}
             >
-              <CardHeader className="p-4 pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded flex-shrink-0 mt-0.5">
-                      {RUN_BADGE(run.sequence)}
-                    </span>
-                    <CardTitle className="text-sm font-semibold line-clamp-2 leading-snug min-w-0">
-                      {run.title}
-                    </CardTitle>
-                  </div>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+              <div>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className="text-xs font-mono font-bold bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 rounded-md">
+                    {RUN_BADGE(run.sequence)}
+                  </span>
                   <StatusDot status={run.status} label={STATUS_LABEL[run.status]} />
-                  {run.plan_id && planTitleById[run.plan_id] && (
-                    <Badge variant="outline" className="text-[10px] py-0 h-5">
-                      {planTitleById[run.plan_id]}
-                    </Badge>
-                  )}
                 </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0 flex flex-col flex-1">
+
+                <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug mb-1">
+                  {run.title}
+                </h3>
+
                 <p className="text-xs text-muted-foreground line-clamp-2 mb-3 min-h-[32px]">
-                  {run.description || 'Sem descrição'}
+                  {run.description || 'Sem descrição cadastrada'}
                 </p>
-                <div className="mb-3">{renderProgress(run)}</div>
-                <div className="mt-auto flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    {formatLocalDate(run.created_at)}
+
+                {run.plan_id && planTitleById[run.plan_id] && (
+                  <div className="mb-3">
+                    <Badge variant="outline" className="text-[11px] py-0.5 px-2 bg-muted/40 border-border/70 truncate max-w-full font-normal">
+                      <ClipboardList className="h-3 w-3 mr-1 text-brand shrink-0" />
+                      <span className="truncate">{planTitleById[run.plan_id]}</span>
+                    </Badge>
                   </div>
-                  {run.assigned_to && <UserAvatar userId={run.assigned_to} />}
+                )}
+              </div>
+
+              <div>
+                <div className="mb-3">{renderProgress(run)}</div>
+
+                <div className="pt-2.5 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground/70" />
+                    <span>{formatLocalDate(run.created_at)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {run.assigned_to && <UserAvatar userId={run.assigned_to} />}
+                    {canManage && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEdit(run)}>
+                            <Edit className="h-3.5 w-3.5 mr-2" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setConfirmDelete(run)} className="text-destructive focus:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      {/* List */}
+      {/* List / Table View */}
       {currentProject && !loading && filtered.length > 0 && viewMode === 'list' && (
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="grid grid-cols-[88px_3fr_1.5fr_2fr_1.5fr_120px_60px] items-center gap-3 px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <div className="bg-card/70 border border-border/70 rounded-xl overflow-hidden shadow-xs">
+          <div className="grid grid-cols-[90px_3fr_1.5fr_2fr_2fr_120px_70px] items-center gap-3 px-4 py-3 bg-muted/40 border-b border-border/70 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             <div>ID</div>
-            <div>Título</div>
+            <div>Ciclo de Teste</div>
             <div>Status</div>
-            <div>Plano vinculado</div>
-            <div>Progresso</div>
+            <div>Plano Vinculado</div>
+            <div>Progresso & Execuções</div>
             <div>Criado em</div>
             <div className="text-right">Ações</div>
           </div>
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-border/50">
             {filtered.map((run) => {
               const prog = progressMap[run.id];
               const pct = prog ? Math.round(prog.completionRate * 100) : 0;
               return (
                 <div
                   key={run.id}
-                  className="grid grid-cols-[88px_3fr_1.5fr_2fr_1.5fr_120px_60px] items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                  className="grid grid-cols-[90px_3fr_1.5fr_2fr_2fr_120px_70px] items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors cursor-pointer"
                   onClick={() => handleOpenEdit(run)}
                 >
                   <div>
-                    <span className="text-xs font-mono bg-brand/10 text-brand px-2 py-0.5 rounded">
+                    <span className="text-xs font-mono font-bold bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 rounded-md">
                       {RUN_BADGE(run.sequence)}
                     </span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{run.title}</div>
-                    <div className="text-xs text-muted-foreground truncate">{run.description}</div>
+                  <div className="min-w-0 pr-2">
+                    <div className="text-sm font-semibold text-foreground truncate">{run.title}</div>
+                    <div className="text-xs text-muted-foreground truncate">{run.description || 'Sem descrição'}</div>
                   </div>
                   <div><StatusDot status={run.status} label={STATUS_LABEL[run.status]} /></div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {run.plan_id ? planTitleById[run.plan_id] || '—' : '—'}
+                    {run.plan_id ? (
+                      <span className="font-medium text-foreground">{planTitleById[run.plan_id] || '—'}</span>
+                    ) : (
+                      '—'
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">{prog?.totals.total || 0} execuções</div>
+                  <div className="space-y-1 pr-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{pct}% concluído</span>
+                      <span>{prog?.totals.total || 0} execuções</span>
+                    </div>
                     <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
@@ -450,19 +588,22 @@ export const TestRuns = () => {
                   <div className="text-xs text-muted-foreground">{formatLocalDate(run.created_at)}</div>
                   <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                     {canManage && (
-                      <>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEdit(run)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => setConfirmDelete(run)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenEdit(run)}>
+                            <Edit className="h-3.5 w-3.5 mr-2" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setConfirmDelete(run)} className="text-destructive focus:text-destructive">
+                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </div>
                 </div>
@@ -472,38 +613,41 @@ export const TestRuns = () => {
         </div>
       )}
 
-      {/* Modal de criação/edição */}
+      {/* Modal de Criação / Edição */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-[540px] rounded-xl border border-border/80 bg-card shadow-2xl p-6">
           <DialogHeader>
-            <DialogTitle>{form.id ? 'Editar ciclo' : 'Novo ciclo de execução'}</DialogTitle>
-            <DialogDescription>
-              Agrupa execuções por sprint, release ou janela específica de testes.
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <Repeat className="h-5 w-5 text-brand" />
+              {form.id ? 'Editar Ciclo de Teste' : 'Novo Ciclo de Teste'}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Agrupe execuções para uma sprint, release ou janela de testes.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Título *</Label>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Título *</Label>
               <Input
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="Ex: Sprint 12 - QA Run"
-                className="bg-muted/30 border-border/60 focus:border-brand/50"
+                placeholder="Ex: Sprint 24 — Validação de Release"
+                className="bg-muted/20 border-border/70 text-xs"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Descrição</Label>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Descrição</Label>
               <Textarea
                 rows={3}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Escopo, objetivo e contexto do ciclo"
-                className="bg-muted/30 border-border/60 focus:border-brand/50 resize-none"
+                placeholder="Escopo, objetivo e contexto operacional do ciclo..."
+                className="bg-muted/20 border-border/70 text-xs resize-none"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</Label>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</Label>
                 <SearchableCombobox
                   items={[
                     { value: 'planned', label: 'Planejado' },
@@ -513,15 +657,18 @@ export const TestRuns = () => {
                   ]}
                   value={form.status}
                   onChange={(v) => v && setForm((f) => ({ ...f, status: v as TestRunStatus }))}
-                  placeholder="Selecione"
+                  placeholder="Selecione o status"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Plano vinculado <span className="normal-case font-normal">(opcional)</span>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Plano Vinculado
                 </Label>
                 <SearchableCombobox
-                  items={[{ value: '', label: '— nenhum —' }, ...plans.map((p) => ({ value: p.id, label: p.title }))]}
+                  items={[{ value: '', label: '— Nenhum —' }, ...plans.map((p) => ({ 
+                    value: p.id, 
+                    label: `${p.sequence != null ? `PT-${String(p.sequence).padStart(3, '0')} — ` : ''}${p.title}` 
+                  }))]}
                   value={form.plan_id}
                   onChange={(v) => setForm((f) => ({ ...f, plan_id: v || '' }))}
                   placeholder="Selecione um plano"
@@ -529,15 +676,15 @@ export const TestRuns = () => {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Interessado <span className="normal-case font-normal">(opcional)</span>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Responsável
               </Label>
               <select
                 value={form.assigned_to}
                 onChange={(e) => setForm((f) => ({ ...f, assigned_to: e.target.value }))}
-                className="w-full rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-foreground focus:outline-none focus:border-brand/50"
+                className="w-full rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs text-foreground focus:outline-none focus:border-brand/50"
               >
-                <option value="">Nenhum</option>
+                <option value="">Nenhum responsável atribuído</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>{labelFor(u)}</option>
                 ))}
@@ -545,48 +692,49 @@ export const TestRuns = () => {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Início</Label>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Data de Início</Label>
                 <Input
                   type="date"
                   value={form.starts_at}
                   onChange={(e) => setForm((f) => ({ ...f, starts_at: e.target.value }))}
-                  className="bg-muted/30 border-border/60"
+                  className="bg-muted/20 border-border/70 text-xs"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Fim</Label>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Data de Término</Label>
                 <Input
                   type="date"
                   value={form.ends_at}
                   onChange={(e) => setForm((f) => ({ ...f, ends_at: e.target.value }))}
-                  className="bg-muted/30 border-border/60"
+                  className="bg-muted/20 border-border/70 text-xs"
                 />
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 pt-2 border-t border-border/40">
             <StandardButton variant="outline" onClick={() => setShowForm(false)} disabled={saving}>
               Cancelar
             </StandardButton>
             <StandardButton variant="brand" onClick={handleSave} disabled={saving}>
-              {saving ? 'Salvando…' : form.id ? 'Atualizar' : 'Criar Ciclo'}
+              {saving ? 'Salvando…' : form.id ? 'Atualizar Ciclo' : 'Criar Ciclo'}
             </StandardButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Modal de Exclusão */}
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border border-border/80 bg-card shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir ciclo?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir ciclo de teste?</AlertDialogTitle>
             <AlertDialogDescription>
-              As execuções vinculadas serão desassociadas (run_id passa a null), mas não serão removidas.
+              As execuções vinculadas serão desassociadas deste ciclo, mas não serão removidas do sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-              Excluir
+              Confirmar Exclusão
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2,15 +2,16 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiClient } from '@/lib/api';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   TrendingUp, ClipboardCheck, Play, Bug, Link2,
-  Download, Loader2, CheckCircle, XCircle, AlertCircle, Clock,
-  Sparkles, FileText, Users, FolderKanban, Copy, RefreshCcw, Calendar, Search
+  Download, Loader2, CheckCircle2, XCircle, AlertCircle, Clock,
+  Sparkles, FileText, Users, FolderKanban, Copy, RefreshCcw, Calendar, 
+  Search, BarChart3, ShieldCheck, FileSpreadsheet, Layers, FileCode2
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import { useProject } from '@/contexts/ProjectContext';
 import { exportToPDF, exportToCSV, exportToExcel, copyToClipboard } from '@/utils/export';
@@ -20,6 +21,7 @@ import { exportToPDF, exportToCSV, exportToExcel, copyToClipboard } from '@/util
 interface RawPlan {
   id: string;
   title: string;
+  sequence?: number;
   generated_by_ai: boolean;
   created_at: string;
 }
@@ -27,6 +29,7 @@ interface RawPlan {
 interface RawCase {
   id: string;
   title: string;
+  sequence?: number;
   plan_id: string;
   generated_by_ai: boolean;
   created_at: string;
@@ -35,6 +38,7 @@ interface RawCase {
 interface RawExecution {
   id: string;
   status: string;
+  sequence?: number;
   plan_id: string | null;
   case_id: string;
   run_id: string | null;
@@ -48,12 +52,14 @@ interface RawExecution {
 interface RawRequirement {
   id: string;
   title: string;
+  sequence?: number;
   created_at: string;
 }
 
 interface RawDefect {
   id: string;
   title: string;
+  sequence?: number;
   status: string;
   severity: string;
   plan_id: string | null;
@@ -89,14 +95,14 @@ const StatCard = ({
 }: {
   label: string; value: string | number; sub?: string; icon: React.ElementType; accent?: string;
 }) => (
-  <div className="border border-border/50 rounded-lg p-4 bg-card/60 backdrop-blur-sm flex items-start gap-3 card-hover transition-all duration-200">
-    <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${accent ?? 'bg-brand/10 text-brand'}`}>
-      <Icon className="h-4.5 w-4.5" />
+  <div className="border border-border/70 rounded-xl p-4 bg-card/60 backdrop-blur-sm flex items-start gap-3.5 card-hover transition-all duration-200 shadow-xs">
+    <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${accent ?? 'bg-brand/10 text-brand border border-brand/20'}`}>
+      <Icon className="h-5 w-5" />
     </div>
     <div className="min-w-0">
       <div className="text-2xl font-bold tracking-tight text-foreground">{value}</div>
-      <div className="text-xs text-muted-foreground leading-tight mt-0.5">{label}</div>
-      {sub && <div className="text-[11px] text-muted-foreground/60 mt-1">{sub}</div>}
+      <div className="text-xs font-medium text-muted-foreground leading-tight mt-0.5">{label}</div>
+      {sub && <div className="text-[11px] text-muted-foreground/70 mt-1">{sub}</div>}
     </div>
   </div>
 );
@@ -105,11 +111,11 @@ const BarRow = ({ label, value, max, color }: { label: string; value: number; ma
   const w = max === 0 ? 0 : Math.round((value / max) * 100);
   return (
     <div className="flex items-center gap-3">
-      <div className="w-24 text-xs text-muted-foreground truncate shrink-0">{label}</div>
-      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+      <div className="w-24 text-xs font-medium text-muted-foreground truncate shrink-0">{label}</div>
+      <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${w}%` }} />
       </div>
-      <div className="text-xs font-semibold w-8 text-right text-foreground">{value} ({w}%)</div>
+      <div className="text-xs font-semibold w-16 text-right text-foreground">{value} <span className="text-muted-foreground font-normal">({w}%)</span></div>
     </div>
   );
 };
@@ -145,7 +151,6 @@ export const Reports = () => {
   const load = useCallback(async () => {
     const projectId = currentProject?.id;
     if (!projectId) {
-      // Clear data
       setRawPlans([]);
       setRawCases([]);
       setRawExecutions([]);
@@ -153,6 +158,7 @@ export const Reports = () => {
       setRawDefects([]);
       setRawLinks([]);
       setRawRuns([]);
+      setProfiles([]);
       return;
     }
 
@@ -164,31 +170,30 @@ export const Reports = () => {
         execsRes,
         reqsRes,
         defectsRes,
-        profilesRes,
+        linksRes,
         runsRes,
-        linksRes
+        profilesRes,
       ] = await Promise.all([
-        apiClient.from('test_plans').select('id, title, generated_by_ai, created_at').eq('project_id', projectId),
-        apiClient.from('test_cases').select('id, title, plan_id, generated_by_ai, created_at').eq('project_id', projectId),
-        apiClient.from('test_executions').select('id, status, plan_id, case_id, run_id, executed_by, user_id, notes, executed_at, created_at').eq('project_id', projectId),
-        apiClient.from('requirements').select('id, title, created_at').eq('project_id', projectId),
-        apiClient.from('defects').select('id, title, status, severity, plan_id, case_id, execution_id, user_id, created_at').eq('project_id', projectId),
-        apiClient.from('profiles').select('id, display_name, email'),
-        apiClient.from('test_runs').select('id, title, sequence').eq('project_id', projectId),
-        apiClient.from('requirement_cases').select('requirement_id, case_id')
+        apiClient.get(`/test-plans?project_id=${projectId}`),
+        apiClient.get(`/test-cases?project_id=${projectId}`),
+        apiClient.get(`/test-executions?project_id=${projectId}`),
+        apiClient.get(`/requirements?project_id=${projectId}`),
+        apiClient.get(`/defects?project_id=${projectId}`),
+        apiClient.get(`/requirement-test-cases?project_id=${projectId}`).catch(() => ({ data: [] })),
+        apiClient.get(`/test-runs?project_id=${projectId}`).catch(() => ({ data: [] })),
+        apiClient.get(`/profiles?project_id=${projectId}`).catch(() => ({ data: [] })),
       ]);
 
-      setRawPlans((plansRes.data as RawPlan[]) || []);
-      setRawCases((casesRes.data as RawCase[]) || []);
-      setRawExecutions((execsRes.data as RawExecution[]) || []);
-      setRawRequirements((reqsRes.data as RawRequirement[]) || []);
-      setRawDefects((defectsRes.data as RawDefect[]) || []);
-      setProfiles((profilesRes.data as Profile[]) || []);
-      setRawRuns((runsRes.data as RawRun[]) || []);
-      setRawLinks((linksRes.data as RawRequirementCase[]) || []);
+      setRawPlans(plansRes.data || []);
+      setRawCases(casesRes.data || []);
+      setRawExecutions(execsRes.data || []);
+      setRawRequirements(reqsRes.data || []);
+      setRawDefects(defectsRes.data || []);
+      setRawLinks(linksRes.data || []);
+      setRawRuns(runsRes.data || []);
+      setProfiles(profilesRes.data || []);
     } catch (e: any) {
-      console.error(e);
-      toast({ title: 'Erro ao carregar relatório', description: e.message || 'Erro de conexão.', variant: 'destructive' });
+      toast({ title: 'Erro ao carregar dados do relatório', description: e?.message || '', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -198,7 +203,7 @@ export const Reports = () => {
     load();
   }, [load]);
 
-  // Clean Filters
+  // Reset Filters
   const handleClearFilters = () => {
     setSelectedPlan('all');
     setSelectedRun('all');
@@ -207,29 +212,7 @@ export const Reports = () => {
     setEndDate('');
   };
 
-  // Filtered Arrays
-  const filteredExecutions = useMemo(() => {
-    let list = rawExecutions;
-    if (selectedPlan !== 'all') {
-      list = list.filter(e => e.plan_id === selectedPlan);
-    }
-    if (selectedRun !== 'all') {
-      list = list.filter(e => e.run_id === selectedRun);
-    }
-    if (selectedUser !== 'all') {
-      list = list.filter(e => e.user_id === selectedUser);
-    }
-    if (startDate) {
-      list = list.filter(e => new Date(e.executed_at || e.created_at) >= new Date(startDate));
-    }
-    if (endDate) {
-      const endLimit = new Date(endDate);
-      endLimit.setHours(23, 59, 59, 999);
-      list = list.filter(e => new Date(e.executed_at || e.created_at) <= endLimit);
-    }
-    return list;
-  }, [rawExecutions, selectedPlan, selectedRun, selectedUser, startDate, endDate]);
-
+  // Filtered Test Cases
   const filteredCases = useMemo(() => {
     let list = rawCases;
     if (selectedPlan !== 'all') {
@@ -238,6 +221,31 @@ export const Reports = () => {
     return list;
   }, [rawCases, selectedPlan]);
 
+  // Filtered Executions
+  const filteredExecutions = useMemo(() => {
+    let list = rawExecutions;
+    if (selectedPlan !== 'all') {
+      const caseIds = new Set(rawCases.filter(c => c.plan_id === selectedPlan).map(c => c.id));
+      list = list.filter(e => e.plan_id === selectedPlan || caseIds.has(e.case_id));
+    }
+    if (selectedRun !== 'all') {
+      list = list.filter(e => e.run_id === selectedRun);
+    }
+    if (selectedUser !== 'all') {
+      list = list.filter(e => e.user_id === selectedUser || e.executed_by === selectedUser);
+    }
+    if (startDate) {
+      list = list.filter(e => new Date(e.created_at || e.executed_at) >= new Date(startDate));
+    }
+    if (endDate) {
+      const endLimit = new Date(endDate);
+      endLimit.setHours(23, 59, 59, 999);
+      list = list.filter(e => new Date(e.created_at || e.executed_at) <= endLimit);
+    }
+    return list;
+  }, [rawExecutions, rawCases, selectedPlan, selectedRun, selectedUser, startDate, endDate]);
+
+  // Filtered Defects
   const filteredDefects = useMemo(() => {
     let list = rawDefects;
     if (selectedPlan !== 'all') {
@@ -287,16 +295,16 @@ export const Reports = () => {
 
     // Defects Severity
     const openDefects = filteredDefects.filter(d => d.status === 'open').length;
-    const closedDefects = filteredDefects.filter(d => d.status === 'closed').length;
+    const closedDefects = filteredDefects.filter(d => d.status === 'closed' || d.status === 'resolved').length;
     const criticalDefects = filteredDefects.filter(d => d.severity === 'critical').length;
     const highDefects = filteredDefects.filter(d => d.severity === 'high').length;
     const mediumDefects = filteredDefects.filter(d => d.severity === 'medium').length;
     const lowDefects = filteredDefects.filter(d => d.severity === 'low').length;
 
     // Recent activities
-    const lastExecution = filteredExecutions.sort((a, b) => b.created_at > a.created_at ? 1 : -1)[0]?.created_at;
-    const lastCase = filteredCases.sort((a, b) => b.created_at > a.created_at ? 1 : -1)[0]?.created_at;
-    const lastPlan = rawPlans.sort((a, b) => b.created_at > a.created_at ? 1 : -1)[0]?.created_at;
+    const lastExecution = filteredExecutions.sort((a, b) => (b.created_at > a.created_at ? 1 : -1))[0]?.created_at;
+    const lastCase = filteredCases.sort((a, b) => (b.created_at > a.created_at ? 1 : -1))[0]?.created_at;
+    const lastPlan = rawPlans.sort((a, b) => (b.created_at > a.created_at ? 1 : -1))[0]?.created_at;
 
     return {
       overview: {
@@ -328,7 +336,7 @@ export const Reports = () => {
         lastExecution, lastCase, lastPlan
       }
     };
-  }, [rawPlans, filteredCases, filteredExecutions, rawRequirements, filteredDefects, rawLinks]);
+  }, [rawPlans, filteredCases, filteredExecutions, rawRequirements, filteredDefects, rawLinks, selectedPlan]);
 
   // Plan Breakdown List
   const planBreakdown = useMemo(() => {
@@ -348,6 +356,7 @@ export const Reports = () => {
       return {
         id: plan.id,
         title: plan.title,
+        sequence: plan.sequence,
         casesCount: planCases.length,
         execsCount: total,
         passed,
@@ -366,20 +375,20 @@ export const Reports = () => {
       ['Planos de Teste', metrics.overview.totalPlans],
       ['Casos de Teste', metrics.overview.totalCases],
       ['Execuções de Teste', metrics.overview.totalExecutions],
-      ['Requisitos', metrics.overview.totalRequirements],
+      ['Requisitos Mapeados', metrics.overview.totalRequirements],
       ['Defeitos Totais', metrics.overview.totalDefects],
-      ['Taxa de Aprovação (%)', metrics.executions.passRate],
-      ['Cobertura de Requisitos (%)', metrics.coverage.coverageRate],
+      ['Taxa de Aprovação (%)', `${metrics.executions.passRate}%`],
+      ['Cobertura de Requisitos (%)', `${metrics.coverage.coverageRate}%`],
       ['Defeitos Abertos', metrics.defects.open],
       ['Defeitos Fechados', metrics.defects.closed],
       ['Defeitos Críticos', metrics.defects.critical],
       ['Defeitos de Severidade Alta', metrics.defects.high],
       ['Casos Gerados por IA', metrics.overview.aiCases],
     ];
-    return { headers, rows, title: `Relatório Consolidado — ${currentProject?.name || 'Todos os Projetos'}` };
+    return { headers, rows, title: `Relatório Consolidado — ${currentProject?.name || 'Nexus TCMS'}` };
   };
 
-  // Export CSV
+  // Export Handlers
   const handleExportCSV = () => {
     if (!hasPermission('can_export')) {
       toast({ title: 'Sem permissão para exportar', variant: 'destructive' });
@@ -390,30 +399,51 @@ export const Reports = () => {
     toast({ title: 'CSV exportado com sucesso!' });
   };
 
-  // Copy Markdown
+  const handleExportExcel = () => {
+    if (!hasPermission('can_export')) {
+      toast({ title: 'Sem permissão para exportar', variant: 'destructive' });
+      return;
+    }
+    const data = getConsolidatedExportData();
+    exportToExcel(data, `relatorio_consolidado_${currentProject?.name || 'nexus'}`);
+    toast({ title: 'Excel exportado com sucesso!' });
+  };
+
+  const handleExportPDF = async () => {
+    if (!hasPermission('can_export')) {
+      toast({ title: 'Sem permissão para exportar', variant: 'destructive' });
+      return;
+    }
+    setExporting(true);
+    try {
+      const data = getConsolidatedExportData();
+      await exportToPDF(data, `relatorio_consolidado_${currentProject?.name || 'nexus'}`);
+      toast({ title: 'PDF gerado com sucesso!' });
+    } catch {
+      toast({ title: 'Erro ao gerar PDF', variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleCopyMarkdown = async () => {
     const timestamp = new Date().toLocaleString('pt-BR');
     const projectName = currentProject?.name || 'Todos os Projetos';
 
-    let md = `# 📊 Relatório Consolidado de Testes — Nexus Testing\n\n`;
+    let md = `# 📊 Relatório Executivo de Qualidade — Nexus TCMS\n\n`;
     md += `* **Projeto:** ${projectName}\n`;
     md += `* **Data de Emissão:** ${timestamp}\n`;
-    md += `* **Filtros Aplicados:**\n`;
-    md += `  * Plano de Teste: ${selectedPlan === 'all' ? 'Todos' : rawPlans.find(p => p.id === selectedPlan)?.title || '—'}\n`;
-    md += `  * Ciclo de Execução: ${selectedRun === 'all' ? 'Todos' : rawRuns.find(r => r.id === selectedRun)?.title || '—'}\n`;
-    md += `  * Responsável: ${selectedUser === 'all' ? 'Todos' : profiles.find(p => p.id === selectedUser)?.display_name || '—'}\n`;
-    md += `  * Período: ${startDate || 'Início'} até ${endDate || 'Fim'}\n\n`;
+    md += `* **Taxa de Aprovação:** **${metrics.executions.passRate}%**\n`;
+    md += `* **Cobertura de Requisitos:** **${metrics.coverage.coverageRate}%**\n\n`;
 
     md += `## 📈 Métricas Gerais\n\n`;
-    md += `| Métrica | Quantidade / Taxa |\n`;
+    md += `| Métrica | Quantidade |\n`;
     md += `| :--- | :--- |\n`;
     md += `| **Planos de Teste** | ${metrics.overview.totalPlans} |\n`;
     md += `| **Casos de Teste** | ${metrics.overview.totalCases} |\n`;
     md += `| **Execuções Realizadas** | ${metrics.overview.totalExecutions} |\n`;
     md += `| **Requisitos Mapeados** | ${metrics.overview.totalRequirements} |\n`;
-    md += `| **Defeitos Encontrados** | ${metrics.overview.totalDefects} |\n`;
-    md += `| **Taxa de Aprovação** | **${metrics.executions.passRate}%** |\n`;
-    md += `| **Cobertura de Requisitos** | **${metrics.coverage.coverageRate}%** |\n\n`;
+    md += `| **Defeitos Encontrados** | ${metrics.overview.totalDefects} |\n\n`;
 
     md += `## 🚀 Status das Execuções\n\n`;
     md += `* **Aprovados:** ${metrics.executions.passed}\n`;
@@ -428,103 +458,106 @@ export const Reports = () => {
     md += `* **Severidade Baixa:** ${metrics.defects.low}\n`;
     md += `* **Status:** ${metrics.defects.open} abertos / ${metrics.defects.closed} fechados\n\n`;
 
-    md += `## 📋 Detalhe por Plano de Teste\n\n`;
-    md += `| Plano de Teste | Casos | Execuções | Aprovados | Falhos | Taxa |\n`;
+    md += `## 📋 Desempenho por Plano de Teste\n\n`;
+    md += `| Plano | Casos | Execuções | Aprovados | Falhos | Taxa |\n`;
     md += `| :--- | :---: | :---: | :---: | :---: | :---: |\n`;
     planBreakdown.forEach(p => {
-      md += `| ${p.title} | ${p.casesCount} | ${p.execsCount} | ${p.passed} | ${p.failed} | ${p.passRate}% |\n`;
+      const pCode = p.sequence != null ? `PT-${String(p.sequence).padStart(3, '0')}` : 'PT-001';
+      md += `| ${pCode} — ${p.title} | ${p.casesCount} | ${p.execsCount} | ${p.passed} | ${p.failed} | ${p.passRate}% |\n`;
     });
 
     const success = await copyToClipboard(md, 'md');
     if (success) {
-      toast({ title: 'Markdown copiado!', description: 'O relatório foi copiado para a área de transferência.' });
+      toast({ title: 'Markdown copiado!', description: 'O relatório executivo foi copiado para a área de transferência.' });
     } else {
       toast({ title: 'Erro ao copiar', variant: 'destructive' });
     }
   };
 
-  // Copy Plain Text
   const handleCopyText = async () => {
     const timestamp = new Date().toLocaleString('pt-BR');
     const projectName = currentProject?.name || 'Todos os Projetos';
 
-    let txt = `========================================================\n`;
-    txt += `       RELATÓRIO CONSOLIDADO DE TESTES — NEXUS\n`;
-    txt += `========================================================\n`;
+    let txt = `RELATÓRIO CONSOLIDADO DE QUALIDADE — NEXUS TCMS\n`;
+    txt += `==============================================\n`;
     txt += `Projeto: ${projectName}\n`;
-    txt += `Gerado em: ${timestamp}\n\n`;
-    txt += `FILTROS:\n`;
-    txt += `- Plano: ${selectedPlan === 'all' ? 'Todos' : rawPlans.find(p => p.id === selectedPlan)?.title || '—'}\n`;
-    txt += `- Ciclo: ${selectedRun === 'all' ? 'Todos' : rawRuns.find(r => r.id === selectedRun)?.title || '—'}\n`;
-    txt += `- Responsável: ${selectedUser === 'all' ? 'Todos' : profiles.find(p => p.id === selectedUser)?.display_name || '—'}\n`;
-    txt += `- Período: ${startDate || 'Início'} - ${endDate || 'Fim'}\n\n`;
-
+    txt += `Data: ${timestamp}\n`;
+    txt += `Taxa de Aprovação: ${metrics.executions.passRate}%\n`;
+    txt += `Cobertura de Requisitos: ${metrics.coverage.coverageRate}%\n\n`;
     txt += `MÉTRICAS GERAIS:\n`;
     txt += `- Planos de Teste: ${metrics.overview.totalPlans}\n`;
     txt += `- Casos de Teste: ${metrics.overview.totalCases}\n`;
-    txt += `- Execuções: ${metrics.overview.totalExecutions}\n`;
-    txt += `- Requisitos: ${metrics.overview.totalRequirements}\n`;
-    txt += `- Defeitos Totais: ${metrics.overview.totalDefects}\n`;
-    txt += `- Taxa de Aprovação: ${metrics.executions.passRate}%\n`;
-    txt += `- Cobertura de Requisitos: ${metrics.coverage.coverageRate}%\n\n`;
-
-    txt += `STATUS DAS EXECUÇÕES:\n`;
-    txt += `- Aprovados: ${metrics.executions.passed}\n`;
-    txt += `- Falhos: ${metrics.executions.failed}\n`;
-    txt += `- Bloqueados: ${metrics.executions.blocked}\n`;
-    txt += `- Não Testados: ${metrics.executions.notTested}\n\n`;
-
-    txt += `DEFEITOS:\n`;
-    txt += `- Críticos: ${metrics.defects.critical}\n`;
-    txt += `- Alta: ${metrics.defects.high}\n`;
-    txt += `- Média: ${metrics.defects.medium}\n`;
-    txt += `- Baixa: ${metrics.defects.low}\n`;
-    txt += `- Status: ${metrics.defects.open} ativos / ${metrics.defects.closed} resolvidos\n\n`;
-
-    txt += `========================================================\n`;
+    txt += `- Execuções: ${metrics.overview.totalExecutions} (Aprovados: ${metrics.executions.passed}, Falhos: ${metrics.executions.failed})\n`;
+    txt += `- Defeitos: ${metrics.overview.totalDefects} (Abertos: ${metrics.defects.open}, Fechados: ${metrics.defects.closed})\n`;
 
     const success = await copyToClipboard(txt, 'txt');
     if (success) {
-      toast({ title: 'Relatório TXT copiado!', description: 'Texto puro formatado copiado com sucesso.' });
+      toast({ title: 'Texto copiado!', description: 'O resumo foi copiado para a área de transferência.' });
     } else {
       toast({ title: 'Erro ao copiar', variant: 'destructive' });
     }
   };
 
-  const fmt = (iso?: string) => iso ? new Date(iso).toLocaleDateString('pt-BR') : '—';
+  const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—');
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 space-y-6 p-6 animate-slide-up">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Relatórios</h1>
-          <p className="text-sm text-muted-foreground">
-            {currentProject ? currentProject.name : 'Todos os projetos'} — visão consolidada e exportação.
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <BarChart3 className="h-6 w-6 text-brand" />
+            Relatórios e Analytics
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {currentProject ? currentProject.name : 'Todos os projetos'} — visão executiva, métricas de qualidade e exportações.
           </p>
         </div>
+
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleClearFilters} className="h-8 text-xs">
-            <RefreshCcw className="h-3.5 w-3.5 mr-1" /> Limpar Filtros
+          <Button variant="outline" size="sm" onClick={handleClearFilters} className="h-9 text-xs border-border/70">
+            <RefreshCcw className="h-3.5 w-3.5 mr-1.5" /> Limpar Filtros
           </Button>
-          <Button size="sm" variant="outline" onClick={handleCopyMarkdown} className="h-8 text-xs">
+
+          <Button size="sm" variant="outline" onClick={handleCopyMarkdown} className="h-9 text-xs border-border/70">
             <Copy className="h-3.5 w-3.5 mr-1.5" /> Copiar MD
           </Button>
-          <Button size="sm" variant="outline" onClick={handleCopyText} className="h-8 text-xs">
+
+          <Button size="sm" variant="outline" onClick={handleCopyText} className="h-9 text-xs border-border/70">
             <FileText className="h-3.5 w-3.5 mr-1.5" /> Copiar TXT
           </Button>
+
           {hasPermission('can_export') && (
-            <Button size="sm" variant="brand" onClick={handleExportCSV} disabled={exporting || loading} className="h-8 text-xs">
-              <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="brand" disabled={exporting || loading} className="h-9 text-xs">
+                  <Download className="h-3.5 w-3.5 mr-1.5" /> Exportar Relatório
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV} className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
+                  <span>Exportar CSV</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel} className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                  <span>Exportar Excel (.xlsx)</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleExportPDF} className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-red-500" />
+                  <span>Exportar PDF</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>
 
-      {/* --- Filtros Avançados --- */}
-      <div className="border border-border/50 rounded-lg p-4 bg-card/40 backdrop-blur-sm space-y-3">
+      {/* Filtros Precisos */}
+      <div className="border border-border/70 rounded-xl p-4 bg-card/60 backdrop-blur-sm space-y-3 shadow-xs">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-          <Search className="h-3.5 w-3.5" /> Filtros Precisos
+          <Search className="h-3.5 w-3.5" /> Filtros Operacionais
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Filtro: Plano */}
@@ -533,22 +566,24 @@ export const Reports = () => {
             <select
               value={selectedPlan}
               onChange={e => setSelectedPlan(e.target.value)}
-              className="w-full h-8 text-xs rounded-md border border-border/60 bg-muted/20 px-2 text-foreground focus:outline-none focus:border-brand/50"
+              className="w-full h-8 text-xs rounded-md border border-border/70 bg-muted/20 px-2 text-foreground focus:outline-none focus:border-brand/50"
             >
               <option value="all">Todos os Planos</option>
               {rawPlans.map(p => (
-                <option key={p.id} value={p.id}>{p.title}</option>
+                <option key={p.id} value={p.id}>
+                  {p.sequence != null ? `PT-${String(p.sequence).padStart(3, '0')} — ` : ''}{p.title}
+                </option>
               ))}
             </select>
           </div>
 
           {/* Filtro: Ciclo */}
           <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Ciclo (Run)</Label>
+            <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Ciclo de Teste</Label>
             <select
               value={selectedRun}
               onChange={e => setSelectedRun(e.target.value)}
-              className="w-full h-8 text-xs rounded-md border border-border/60 bg-muted/20 px-2 text-foreground focus:outline-none focus:border-brand/50"
+              className="w-full h-8 text-xs rounded-md border border-border/70 bg-muted/20 px-2 text-foreground focus:outline-none focus:border-brand/50"
             >
               <option value="all">Todos os Ciclos</option>
               {rawRuns.map(r => (
@@ -563,7 +598,7 @@ export const Reports = () => {
             <select
               value={selectedUser}
               onChange={e => setSelectedUser(e.target.value)}
-              className="w-full h-8 text-xs rounded-md border border-border/60 bg-muted/20 px-2 text-foreground focus:outline-none focus:border-brand/50"
+              className="w-full h-8 text-xs rounded-md border border-border/70 bg-muted/20 px-2 text-foreground focus:outline-none focus:border-brand/50"
             >
               <option value="all">Todos os Usuários</option>
               {profiles.map(p => (
@@ -579,7 +614,7 @@ export const Reports = () => {
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="h-8 text-xs bg-muted/20 border-border/60 focus:border-brand/50"
+              className="h-8 text-xs bg-muted/20 border-border/70 focus:border-brand/50"
             />
           </div>
 
@@ -590,7 +625,7 @@ export const Reports = () => {
               type="date"
               value={endDate}
               onChange={e => setEndDate(e.target.value)}
-              className="h-8 text-xs bg-muted/20 border-border/60 focus:border-brand/50"
+              className="h-8 text-xs bg-muted/20 border-border/70 focus:border-brand/50"
             />
           </div>
         </div>
@@ -598,19 +633,21 @@ export const Reports = () => {
 
       {loading ? (
         <div className="flex items-center justify-center h-64 gap-3 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm">Carregando dados estruturados...</span>
+          <Loader2 className="h-5 w-5 animate-spin text-brand" />
+          <span className="text-sm">Carregando métricas e dados analíticos...</span>
         </div>
       ) : !currentProject ? (
-        <div className="border border-border/50 rounded-lg p-12 text-center text-muted-foreground bg-card/30">
-          Selecione um projeto ativo no painel superior para extrair métricas de relatórios.
+        <div className="border border-border/60 rounded-xl p-12 text-center text-muted-foreground bg-card/30">
+          Selecione um projeto ativo para extrair relatórios executivos.
         </div>
       ) : (
         <div className="space-y-6">
 
-          {/* -- Visão Geral -- */}
+          {/* -- Visão Geral KPI Cards -- */}
           <section>
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Visão Geral</h2>
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Métricas Principais
+            </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
               <StatCard label="Planos de Teste" value={metrics.overview.totalPlans} icon={FileText} />
               <StatCard label="Casos de Teste" value={metrics.overview.totalCases} icon={ClipboardCheck} />
@@ -631,11 +668,11 @@ export const Reports = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* Execuções */}
-            <div className="border border-border/50 rounded-lg p-4 bg-card/60 backdrop-blur-sm space-y-4">
+            <div className="border border-border/70 rounded-xl p-4 bg-card/60 backdrop-blur-sm space-y-4 shadow-xs">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-foreground">Resultado das Execuções</h2>
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-lg font-bold ${metrics.executions.passRate >= 80 ? 'text-emerald-400' : metrics.executions.passRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                  <span className={`text-xl font-bold ${metrics.executions.passRate >= 80 ? 'text-emerald-400' : metrics.executions.passRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
                     {metrics.executions.passRate}%
                   </span>
                   <span className="text-xs text-muted-foreground">de aprovação</span>
@@ -650,11 +687,11 @@ export const Reports = () => {
             </div>
 
             {/* Cobertura de requisitos */}
-            <div className="border border-border/50 rounded-lg p-4 bg-card/60 backdrop-blur-sm space-y-4">
+            <div className="border border-border/70 rounded-xl p-4 bg-card/60 backdrop-blur-sm space-y-4 shadow-xs">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-foreground">Cobertura de Requisitos</h2>
                 <div className="flex items-center gap-1.5">
-                  <span className={`text-lg font-bold ${metrics.coverage.coverageRate >= 80 ? 'text-emerald-400' : metrics.coverage.coverageRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                  <span className={`text-xl font-bold ${metrics.coverage.coverageRate >= 80 ? 'text-emerald-400' : metrics.coverage.coverageRate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
                     {metrics.coverage.coverageRate}%
                   </span>
                   <span className="text-xs text-muted-foreground">cobertos</span>
@@ -669,13 +706,13 @@ export const Reports = () => {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-md bg-muted/40 p-2.5">
-                  <div className="text-xs text-muted-foreground">Com casos vinculados</div>
-                  <div className="font-semibold text-emerald-400 mt-1">{metrics.coverage.covered}</div>
+                <div className="rounded-lg bg-muted/30 border border-border/50 p-3">
+                  <div className="text-xs text-muted-foreground font-medium">Com casos vinculados</div>
+                  <div className="font-bold text-emerald-400 text-lg mt-0.5">{metrics.coverage.covered}</div>
                 </div>
-                <div className="rounded-md bg-muted/40 p-2.5">
-                  <div className="text-xs text-muted-foreground">Sem cobertura</div>
-                  <div className="font-semibold text-muted-foreground mt-1">
+                <div className="rounded-lg bg-muted/30 border border-border/50 p-3">
+                  <div className="text-xs text-muted-foreground font-medium">Sem cobertura</div>
+                  <div className="font-bold text-muted-foreground text-lg mt-0.5">
                     {metrics.coverage.total - metrics.coverage.covered}
                   </div>
                 </div>
@@ -687,32 +724,32 @@ export const Reports = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
             {/* Defeitos */}
-            <div className="border border-border/50 rounded-lg p-4 bg-card/60 backdrop-blur-sm space-y-3">
+            <div className="border border-border/70 rounded-xl p-4 bg-card/60 backdrop-blur-sm space-y-3 shadow-xs">
               <h2 className="text-sm font-semibold text-foreground">Defeitos por Gravidade</h2>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="rounded-md bg-red-950/20 border border-red-500/10 p-2.5">
+                <div className="rounded-lg bg-red-950/20 border border-red-500/20 p-2.5">
                   <div className="text-xs text-red-400 font-semibold uppercase tracking-wider">Críticos</div>
                   <div className="text-xl font-bold text-red-500 mt-1">{metrics.defects.critical}</div>
                 </div>
-                <div className="rounded-md bg-orange-950/20 border border-orange-500/10 p-2.5">
+                <div className="rounded-lg bg-orange-950/20 border border-orange-500/20 p-2.5">
                   <div className="text-xs text-orange-400 font-semibold uppercase tracking-wider">Altos</div>
                   <div className="text-xl font-bold text-orange-500 mt-1">{metrics.defects.high}</div>
                 </div>
-                <div className="rounded-md bg-amber-950/20 border border-amber-500/10 p-2.5">
+                <div className="rounded-lg bg-amber-950/20 border border-amber-500/20 p-2.5">
                   <div className="text-xs text-amber-400 font-semibold uppercase tracking-wider">Médios</div>
                   <div className="text-xl font-bold text-amber-500 mt-1">{metrics.defects.medium}</div>
                 </div>
-                <div className="rounded-md bg-blue-950/20 border border-blue-500/10 p-2.5">
+                <div className="rounded-lg bg-blue-950/20 border border-blue-500/20 p-2.5">
                   <div className="text-xs text-blue-400 font-semibold uppercase tracking-wider">Baixos</div>
                   <div className="text-xl font-bold text-blue-500 mt-1">{metrics.defects.low}</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="text-xs text-muted-foreground flex justify-between bg-muted/20 px-2.5 py-1.5 rounded-md">
+                <div className="text-xs text-muted-foreground flex justify-between bg-muted/20 border border-border/40 px-3 py-2 rounded-lg">
                   <span>Defeitos Abertos</span>
                   <span className="font-bold text-red-400">{metrics.defects.open}</span>
                 </div>
-                <div className="text-xs text-muted-foreground flex justify-between bg-muted/20 px-2.5 py-1.5 rounded-md">
+                <div className="text-xs text-muted-foreground flex justify-between bg-muted/20 border border-border/40 px-3 py-2 rounded-lg">
                   <span>Defeitos Fechados</span>
                   <span className="font-bold text-emerald-400">{metrics.defects.closed}</span>
                 </div>
@@ -720,27 +757,27 @@ export const Reports = () => {
             </div>
 
             {/* Atividade recente */}
-            <div className="border border-border/50 rounded-lg p-4 bg-card/60 backdrop-blur-sm space-y-3">
-              <h2 className="text-sm font-semibold text-foreground">Última Atividade</h2>
+            <div className="border border-border/70 rounded-xl p-4 bg-card/60 backdrop-blur-sm space-y-3 shadow-xs">
+              <h2 className="text-sm font-semibold text-foreground">Última Atividade Registrada</h2>
               <div className="space-y-2.5 pt-1">
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/20 border border-border/40">
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Play className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    <Play className="h-3.5 w-3.5 text-brand" />
                     Última execução
                   </div>
                   <span className="text-xs font-semibold text-foreground">{fmt(metrics.recentActivity.lastExecution)}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/20 border border-border/40">
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground/60" />
-                    Último caso criado
+                    <ClipboardCheck className="h-3.5 w-3.5 text-brand" />
+                    Último caso cadastrado
                   </div>
                   <span className="text-xs font-semibold text-foreground">{fmt(metrics.recentActivity.lastCase)}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/20 border border-border/40">
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground/60" />
-                    Último plano criado
+                    <FileText className="h-3.5 w-3.5 text-brand" />
+                    Último plano cadastrado
                   </div>
                   <span className="text-xs font-semibold text-foreground">{fmt(metrics.recentActivity.lastPlan)}</span>
                 </div>
@@ -749,31 +786,38 @@ export const Reports = () => {
           </div>
 
           {/* -- Detalhamento por Planos de Teste -- */}
-          <div className="border border-border/50 rounded-lg overflow-hidden bg-card/60 backdrop-blur-sm">
-            <div className="px-4 py-3 bg-muted/40 border-b border-border flex justify-between items-center">
+          <div className="border border-border/70 rounded-xl overflow-hidden bg-card/60 backdrop-blur-sm shadow-xs">
+            <div className="px-4 py-3 bg-muted/40 border-b border-border/70 flex justify-between items-center">
               <h2 className="text-sm font-semibold text-foreground">Desempenho por Plano de Teste</h2>
               <span className="text-xs text-muted-foreground font-medium">{planBreakdown.length} planos cadastrados</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
+                  <tr className="bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border/60">
                     <th className="px-4 py-2.5">Plano de Teste</th>
                     <th className="px-4 py-2.5 text-center">Casos</th>
                     <th className="px-4 py-2.5 text-center">Execuções</th>
                     <th className="px-4 py-2.5 text-center text-emerald-400">Aprovados</th>
                     <th className="px-4 py-2.5 text-center text-red-400">Falhos</th>
-                    <th className="px-4 py-2.5 text-right">Aprovação</th>
+                    <th className="px-4 py-2.5 text-right">Taxa de Aprovação</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border text-sm">
+                <tbody className="divide-y divide-border/50 text-sm">
                   {planBreakdown.map(p => (
-                    <tr key={p.id} className="hover:bg-muted/10 transition-colors">
-                      <td className="px-4 py-3 font-medium text-foreground truncate max-w-xs">{p.title}</td>
+                    <tr key={p.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 font-medium text-foreground truncate max-w-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold bg-brand/10 text-brand border border-brand/20 px-2 py-0.5 rounded-md">
+                            {p.sequence != null ? `PT-${String(p.sequence).padStart(3, '0')}` : 'PT-001'}
+                          </span>
+                          <span className="truncate">{p.title}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-center text-muted-foreground">{p.casesCount}</td>
                       <td className="px-4 py-3 text-center text-muted-foreground">{p.execsCount}</td>
-                      <td className="px-4 py-3 text-center font-medium text-emerald-500">{p.passed}</td>
-                      <td className="px-4 py-3 text-center font-medium text-red-500">{p.failed}</td>
+                      <td className="px-4 py-3 text-center font-semibold text-emerald-500">{p.passed}</td>
+                      <td className="px-4 py-3 text-center font-semibold text-red-500">{p.failed}</td>
                       <td className="px-4 py-3 text-right font-bold text-foreground">
                         <span className={p.passRate >= 80 ? 'text-emerald-400' : p.passRate >= 50 ? 'text-amber-400' : 'text-red-400'}>
                           {p.passRate}%
@@ -793,34 +837,41 @@ export const Reports = () => {
             </div>
           </div>
 
-          {/* -- Defeitos Registrados (Top 10) -- */}
-          <div className="border border-border/50 rounded-lg overflow-hidden bg-card/60 backdrop-blur-sm">
-            <div className="px-4 py-3 bg-muted/40 border-b border-border flex justify-between items-center">
-              <h2 className="text-sm font-semibold text-foreground">Defeitos do Período</h2>
-              <span className="text-xs text-muted-foreground font-medium">{filteredDefects.length} defeitos filtrados</span>
+          {/* -- Defeitos do Período -- */}
+          <div className="border border-border/70 rounded-xl overflow-hidden bg-card/60 backdrop-blur-sm shadow-xs">
+            <div className="px-4 py-3 bg-muted/40 border-b border-border/70 flex justify-between items-center">
+              <h2 className="text-sm font-semibold text-foreground">Defeitos Registrados</h2>
+              <span className="text-xs text-muted-foreground font-medium">{filteredDefects.length} defeitos no período</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
-                    <th className="px-4 py-2.5">Título</th>
+                  <tr className="bg-muted/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border/60">
+                    <th className="px-4 py-2.5">Título / Defeito</th>
                     <th className="px-4 py-2.5 text-center">Severidade</th>
                     <th className="px-4 py-2.5 text-center">Status</th>
                     <th className="px-4 py-2.5 text-right">Data de Registro</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border text-sm">
+                <tbody className="divide-y divide-border/50 text-sm">
                   {filteredDefects.slice(0, 10).map(d => (
-                    <tr key={d.id} className="hover:bg-muted/10 transition-colors">
-                      <td className="px-4 py-3 font-medium text-foreground truncate max-w-sm">{d.title}</td>
+                    <tr key={d.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 font-medium text-foreground truncate max-w-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold bg-destructive/10 text-destructive border border-destructive/20 px-2 py-0.5 rounded-md">
+                            {d.sequence != null ? `DEF-${String(d.sequence).padStart(3, '0')}` : 'DEF-001'}
+                          </span>
+                          <span className="truncate">{d.title}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-center">
                         <Badge
                           variant="outline"
                           className={
-                            d.severity === 'critical' ? 'bg-red-500/10 text-red-400 border-red-500/20 text-[10px] uppercase font-bold py-0 h-5' :
-                            d.severity === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] uppercase font-bold py-0 h-5' :
-                            d.severity === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] uppercase font-bold py-0 h-5' :
-                            'bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px] uppercase font-bold py-0 h-5'
+                            d.severity === 'critical' ? 'bg-red-500/10 text-red-400 border-red-500/20 text-[11px] font-semibold py-0.5' :
+                            d.severity === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20 text-[11px] font-semibold py-0.5' :
+                            d.severity === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 text-[11px] font-semibold py-0.5' :
+                            'bg-blue-500/10 text-blue-400 border-blue-500/20 text-[11px] font-semibold py-0.5'
                           }
                         >
                           {d.severity === 'critical' ? 'Crítico' : d.severity === 'high' ? 'Alto' : d.severity === 'medium' ? 'Médio' : 'Baixo'}
@@ -829,7 +880,7 @@ export const Reports = () => {
                       <td className="px-4 py-3 text-center">
                         <Badge
                           variant="outline"
-                          className={d.status === 'open' ? 'bg-red-500/10 text-red-400 border-red-500/20 text-[10px]' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]'}
+                          className={d.status === 'open' ? 'bg-red-500/10 text-red-400 border-red-500/20 text-[11px] font-semibold' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[11px] font-semibold'}
                         >
                           {d.status === 'open' ? 'Aberto' : 'Resolvido'}
                         </Badge>

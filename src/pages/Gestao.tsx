@@ -7,7 +7,7 @@ import { Coverage } from '@/pages/Coverage';
 import { useSearchParams } from 'react-router-dom';
 import { ViewModeToggle } from '@/components/ViewModeToggle';
 import { StandardButton } from '@/components/StandardButton';
-import { Plus } from 'lucide-react';
+import { Plus, ShieldCheck, FileCode2, Network, Bug, Layers } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useProject } from '@/contexts/ProjectContext';
 
@@ -46,7 +46,6 @@ export const Gestao = () => {
 
   const handleCreate = () => {
     const params = new URLSearchParams(searchParams);
-    // Sinalizar abertura de criação na aba atual
     if (tab === 'requirements') {
       params.set('openCreate', '1');
       setSearchParams(params);
@@ -57,7 +56,6 @@ export const Gestao = () => {
       setSearchParams(params);
       return;
     }
-    // Na aba de rastreabilidade, redirecionar para Requisitos e abrir criação
     if (tab === 'traceability') {
       params.set('tab', 'requirements');
       params.set('openCreate', '1');
@@ -67,12 +65,17 @@ export const Gestao = () => {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-6">
-      {/* Header padrão como outras páginas */}
-      <div className="flex items-center justify-between">
+    <div className="flex-1 space-y-6 p-6 animate-slide-up">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Gestão</h1>
-          <p className="text-sm text-muted-foreground">Organize requisitos, vínculos e defeitos</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <ShieldCheck className="h-6 w-6 text-brand" />
+            Gestão da Qualidade
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Organize requisitos de software, matriz de rastreabilidade, cobertura e defeitos.
+          </p>
         </div>
         {tab !== 'coverage' && (((tab === 'requirements' || tab === 'traceability') && hasPermission('can_manage_cases')) || (tab === 'defects' && hasPermission('can_manage_executions'))) ? (
           <StandardButton
@@ -89,23 +92,40 @@ export const Gestao = () => {
 
       <div className="mt-2">
         <Tabs value={tab} onValueChange={handleTabChange}>
-          <div className="flex items-center justify-between">
-            <TabsList className="bg-transparent p-0 h-auto border-b border-border rounded-none">
-              <TabsTrigger value="requirements" className="rounded-none px-3 pb-3 pt-1 data-[state=active]:border-b-2 data-[state=active]:border-brand data-[state=active]:text-brand">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+            <TabsList className="bg-muted/30 p-1 rounded-xl border border-border/60 h-auto flex flex-wrap gap-1">
+              <TabsTrigger 
+                value="requirements" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <FileCode2 className="h-3.5 w-3.5" />
                 Requisitos
               </TabsTrigger>
-              <TabsTrigger value="traceability" className="rounded-none px-3 pb-3 pt-1 data-[state=active]:border-b-2 data-[state=active]:border-brand data-[state=active]:text-brand">
+              <TabsTrigger 
+                value="traceability" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <Network className="h-3.5 w-3.5" />
                 Matriz de Rastreabilidade
               </TabsTrigger>
-              <TabsTrigger value="defects" className="rounded-none px-3 pb-3 pt-1 data-[state=active]:border-b-2 data-[state=active]:border-brand data-[state=active]:text-brand">
+              <TabsTrigger 
+                value="defects" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <Bug className="h-3.5 w-3.5" />
                 Defeitos
               </TabsTrigger>
-              <TabsTrigger value="coverage" className="rounded-none px-3 pb-3 pt-1 data-[state=active]:border-b-2 data-[state=active]:border-brand data-[state=active]:text-brand">
+              <TabsTrigger 
+                value="coverage" 
+                className="rounded-lg px-3.5 py-1.5 text-xs font-semibold data-[state=active]:bg-card data-[state=active]:text-brand data-[state=active]:shadow-xs transition-all flex items-center gap-2"
+              >
+                <Layers className="h-3.5 w-3.5" />
                 Cobertura
               </TabsTrigger>
             </TabsList>
+
             {tab !== 'coverage' && (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 self-end sm:self-auto">
                 <ViewModeToggle
                   viewMode={tabView[tab as keyof typeof tabView] ?? 'list'}
                   onViewModeChange={(mode) => setTabView(v => ({ ...v, [tab]: mode }))}
